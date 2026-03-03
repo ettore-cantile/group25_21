@@ -31,3 +31,10 @@ Introduce labels (abstract ones, like wine producers, and data-dependent ones).
 ### 3. Dimensional Fidelity Evaluation
 Highlight how faithful the obtained two-dimensional projection is to the original multidimensional clusters/spaces.
 * **Switch Functionality:** The requirement is to create a switch that, through the use of K-Means, allows the user to visualize the possible intersections/areas of interest among the mentioned elements (the 3 original clusters, the "producers" clusters, etc.).
+
+---
+
+## Authors
+- Matteo Ventali (1985026)
+- Ettore Cantile (2026562)
+- Leonardo Chiarparin (2016363)
