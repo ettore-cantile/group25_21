@@ -12,6 +12,7 @@ from sklearn.metrics import euclidean_distances
 # ==========================================
 # Percorsi relativi alla posizione di questo file
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_FILE = os.path.join(SCRIPT_DIR, '../dataset/wine_data.json')
 CSV_FILENAME = os.path.join(SCRIPT_DIR, '../dataset/wine.csv')  # <--- Inserisci qui il nome del tuo file
 TARGET_COLUMN = 'Producer'       # <--- Inserisci il nome della colonna che contiene le etichette/classi
                                #      (Se non ce l'hai, lascia una stringa vuota "")
@@ -102,7 +103,7 @@ for i in range(len(X)):
         "class_name": class_names[i] # Usa le etichette dal CSV
     })
 
-OUTPUT_FILE = os.path.join(SCRIPT_DIR, '../dataset/wine_data.json') # Mantengo lo stesso nome così l'HTML funziona senza modifiche
+ # Mantengo lo stesso nome così l'HTML funziona senza modifiche
 with open(OUTPUT_FILE, 'w') as f:
     json.dump(data_export, f)
 
