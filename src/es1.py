@@ -9,7 +9,7 @@ from sklearn.metrics import euclidean_distances
 # ==========================================
 # 1. CONFIGURAZIONE UTENTE
 # ==========================================
-CSV_FILENAME = 'C:/Users/ecant/OneDrive/Desktop/wine.csv'  # <--- Inserisci qui il nome del tuo file
+CSV_FILENAME = '/home/matteo/Universita/Visual_Analytics/group25_21/dataset/wine.csv'  # <--- Inserisci qui il nome del tuo file
 TARGET_COLUMN = None       # <--- Inserisci il nome della colonna che contiene le etichette/classi
                                #      (Se non ce l'hai, lascia una stringa vuota "")
 
@@ -99,7 +99,7 @@ for i in range(len(X)):
         "class_name": class_names[i] # Usa le etichette dal CSV
     })
 
-OUTPUT_FILE = 'C:/Users/ecant/OneDrive/Desktop/wine.json' # Mantengo lo stesso nome così l'HTML funziona senza modifiche
+OUTPUT_FILE = '/home/matteo/Universita/Visual_Analytics/group25_21/dataset/wine_data.json' # Mantengo lo stesso nome così l'HTML funziona senza modifiche
 with open(OUTPUT_FILE, 'w') as f:
     json.dump(data_export, f)
 
