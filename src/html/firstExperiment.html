@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Visual Analytics: PCA vs MDS</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="../css/firstExperiment.css">
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1>Analisi Qualità Proiezioni</h1>
+            <div class="subtitle">Dataset: Wine (PCA vs MDS)</div>
+        </div>
+        <div class="header-controls">
+            <div class="controls">
+                <button id="btn-error" class="active" onclick="setMode('error')">Mostra Distorsione</button>
+                <button id="btn-class" onclick="setMode('class')">Mostra Cluster (Classi)</button>
+            </div>
+            <div id="legend-error" class="legend-container">
+                <span>Strappo (FN)</span>
+                <div id="discrete-error-legend" class="discrete-bar"></div>
+                <span>Schiacciamento (FP)</span>
+            </div>
+            <div id="legend-class" class="legend-container" style="display: none;"></div>
+        </div>
+    </header>
+
+    <div class="stats-bar">
+        <div class="stat-group">
+            <div class="stat-title">PCA SCORE</div>
+            <div class="stat-value">Err Globale: <span id="stat-pca-err">...</span></div>
+            <div class="stat-value highlight">Match: <span id="stat-pca-match">...</span>%</div>
+        </div>
+        <div class="stat-group">
+            <div class="stat-title">MDS SCORE</div>
+            <div class="stat-value">Err Globale: <span id="stat-mds-err">...</span></div>
+            <div class="stat-value highlight">Match: <span id="stat-mds-match">...</span>%</div>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="chart-card" id="container-pca">
+            <div class="chart-title">PCA (Varianza Globale)</div>
+            <div id="chart-pca" class="chart-area"></div>
+        </div>
+        <div class="chart-card" id="container-mds">
+            <div class="chart-title">MDS (Distanze Locali)</div>
+            <div id="chart-mds" class="chart-area"></div>
+        </div>
+    </div>
+
+    <div id="tooltip"></div>
+    <script src="../js/firstExperiment.js" defer></script>
+</body>
+</html>
