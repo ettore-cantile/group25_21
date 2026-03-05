@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DR Quality & Artifacts Dashboard</title>
+    <link rel="stylesheet" href="../css/dashboard.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+
+    <div id="app-grid">
+        <header class="header">
+            <div>
+                <h1>Dimensionality Reduction Quality</h1>
+                <p class="subtitle">Comparing PCA and Euclidean MDS via Relationship Metrics</p>
+            </div>
+            <div id="global-assessment" class="assessment-box">
+                </div>
+        </header>
+
+        <aside class="left-panel">
+            <h3>Color Scale</h3>
+            <p class="help-text">Select a metric to color the points and uncover projection artifacts.</p>
+            
+            <div class="control-group">
+                <label><input type="radio" name="colorMode" value="original" checked> Original Labels</label>
+                <label><input type="radio" name="colorMode" value="precision"> False Positives (Blue)</label>
+                <label><input type="radio" name="colorMode" value="recall"> False Negatives (Red)</label>
+                <label><input type="radio" name="colorMode" value="fscore"> Combined F-Score</label>
+            </div>
+
+            <div id="legend-container">
+                <h4>Legend</h4>
+                <div id="legend-gradient"></div>
+                <div class="legend-labels">
+                    <span id="legend-min">Min</span>
+                    <span id="legend-max">Max</span>
+                </div>
+                <p id="legend-description" class="help-text">Colors map to class labels.</p>
+            </div>
+        </aside>
+
+        <main class="main-stage">
+            <div class="plot-container">
+                <div class="plot-title">PCA Projection</div>
+                <div id="pca-plot" class="svg-container"></div>
+            </div>
+            <div class="plot-container">
+                <div class="plot-title">Euclidean MDS Projection</div>
+                <div id="mds-plot" class="svg-container"></div>
+            </div>
+        </main>
+
+        <aside class="right-panel">
+            <h3>Live Analytics</h3>
+            <div id="analytics-content">
+                <p class="help-text">Hover over a point or draw a selection box (brush) on the PCA plot to analyze local cluster quality.</p>
+            </div>
+            
+            <div id="brush-stats" class="hidden">
+                <h4>Selection Stats</h4>
+                <p><strong>Points Selected:</strong> <span id="stat-count">0</span></p>
+                <p><strong>Avg Precision:</strong> <span id="stat-precision">0</span></p>
+                <p><strong>Avg Recall:</strong> <span id="stat-recall">0</span></p>
+                <p><strong>Avg F-Score:</strong> <span id="stat-fscore">0</span></p>
+            </div>
+        </aside>
+    </div>
+
+    <div id="tooltip"></div>
+
+    <script src="../js/dashboard.js"></script>
+</body>
+</html>
