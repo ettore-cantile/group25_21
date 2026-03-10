@@ -4,6 +4,7 @@ let metadata = {};
 let colorMode = 'original';
 let uniqueClasses = [];
 let pointById = new Map();
+let currentPointSize = 5;
 
 // D3 Brushes
 const brushPCA = d3.brush();
@@ -16,11 +17,11 @@ customTableau[2] = '#2ca02c'; // Sostituisce il rosso (#e15759) con un verde sta
 const colorOriginal = d3.scaleOrdinal(customTableau);
 
 // Precision (Blues): Scala invertita. 0 (Poco preciso) = Blu scuro -> 1 (Molto preciso) = Azzurro chiaro.
-const bluesDiscrete = ["#08519c", "#3182bd", "#6baed6", "#bdd7e7", "#eff3ff"];
+const bluesDiscrete = ["#08519c", "#3182bd", "#6baed6", "#9ecae1", "#c6dbef"];
 const colorPrecision = d3.scaleQuantize().domain([0, 1]).range(bluesDiscrete); 
 
 // Recall (Reds): Scala invertita. 0 (Poco coeso) = Rosso scuro -> 1 (Molto coeso) = Rosa chiaro.
-const redsDiscrete = ["#a50f15", "#de2d26", "#fb6a4a", "#fcae91", "#fee5d9"];
+const redsDiscrete = ["#a50f15", "#de2d26", "#fb6a4a", "#fc9272", "#fcbba1"];
 const colorRecall = d3.scaleQuantize().domain([0, 1]).range(redsDiscrete);
 
 // F-Score (Red-Yellow-Green): Scala più intuitiva. 0 (Pessimo) = Rosso, 0.5 = Giallo, 1 (Ottimo) = Verde.
@@ -113,6 +114,12 @@ Promise.all([
         updateLegend();
     });
 
+    // Listener per il cambio dimensione punti
+    d3.select("#point-size-slider").on("input", function() {
+        currentPointSize = +this.value;
+        d3.selectAll("circle.dot").attr("r", currentPointSize);
+    });
+
     updateLegend();
 }).catch(err => console.error("Error loading JSON:", err));
 
@@ -173,7 +180,7 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
         .attr("id", d => `dot-${d.id}`)
         .attr("cx", d => xScale(d[xKey]))
         .attr("cy", d => yScale(d[yKey]))
-        .attr("r", 5)
+        .attr("r", currentPointSize)
         .attr("fill", d => getColor(d))
         // FIX 1: Bordo grigio scuro semitrasparente. Ancora visivamente il punto allo sfondo!
         .attr("stroke", "rgba(0,0,0,0.4)")
@@ -189,7 +196,7 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
             resetAllHovers();
 
             d3.selectAll(`#dot-${d.id}`)
-              .attr("r", 8)
+              .attr("r", currentPointSize * 1.6)
               .attr("stroke", "rgba(0,0,0,0.9)") // Bordo più netto all'hover
               .attr("stroke-width", 2)
               .raise();
@@ -305,7 +312,7 @@ function handleBrush(event, brushObj, xKey, yKey) {
  */
 function resetAllHovers() {
     d3.selectAll("circle.dot")
-        .attr("r", 5)
+        .attr("r", currentPointSize)
         .attr("stroke", "rgba(0,0,0,0.4)")
         .attr("stroke-width", 0.8);
     hideTooltip();
@@ -446,8 +453,8 @@ function updateLiveAnalytics(selectedPoints) {
         const avgRecall = d3.mean(selectedPoints, d => d.recall);
         const avgFScore = d3.mean(selectedPoints, d => d.f_score);
 
-        updateGauge(gauges.precision, avgPrec, colorPrecision(avgPrec), "#val-precision");
-        updateGauge(gauges.recall, avgRecall, colorRecall(avgRecall), "#val-recall");
+        updateGauge(gauges.precision, avgPrec, colorFScore(avgPrec), "#val-precision");
+        updateGauge(gauges.recall, avgRecall, colorFScore(avgRecall), "#val-recall");
         updateGauge(gauges.fscore, avgFScore, colorFScore(avgFScore), "#val-fscore");
     }
 }
