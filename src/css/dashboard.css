@@ -2,193 +2,102 @@
    RESET E IMPOSTAZIONI GLOBALI
    ========================================= */
 * { box-sizing: border-box; }
-body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; }
+body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eaeff1; color: #333; }
 
 /* =========================================
    LAYOUT PRINCIPALE (CSS GRID)
    ========================================= */
 #app-grid { 
     display: grid; 
-    grid-template-columns: 1fr 380px; 
-    grid-template-rows: auto auto 1fr; 
+    grid-template-columns: 1fr 1fr 1fr; 
+    grid-template-rows: auto auto 1fr 50px; 
     grid-template-areas: 
-        "header header"
-        "controls analytics"
-        "main analytics";
-    height: 100%; 
-    width: 100%;
+        "header header header"
+        "controls controls controls"
+        "pca mds neighbor"
+        "footer footer footer";
+    height: 100vh; 
+    width: 100vw;
+    gap: 12px;
+    padding-bottom: 12px;
 }
 
 /* =========================================
-   HEADER & STATIC ANALYTICS
+   HEADER & CONTROLS
    ========================================= */
-.header { grid-area: header; background-color: #ffffff; border-bottom: 1px solid #ddd; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; }
-h1 { margin: 0; font-size: 1.5rem; color: #2c3e50; }
-.subtitle { margin: 2px 0 0 0; font-size: 0.9rem; color: #7f8c8d; }
+.header { grid-area: header; background-color: #ffffff; border-bottom: 1px solid #ddd; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); z-index: 10; }
+h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; }
+.subtitle { margin: 0; font-size: 0.8rem; color: #7f8c8d; }
 
-.header-stats { display: flex; gap: 20px; align-items: center; }
-
-.assessment-box { background: #e8f4f8; padding: 10px 15px; border-radius: 6px; border-left: 4px solid #3498db; font-weight: normal; font-size: 0.95rem; }
-
-.projection-metrics { display: none; } /* Moved to right panel */
-.proj-metric-col { display: flex; flex-direction: column; font-size: 0.85rem; color: #555; }
-.proj-metric-col strong { color: #2c3e50; border-bottom: 1px solid #ddd; margin-bottom: 4px; padding-bottom: 2px; }
-.proj-metric-col span { margin-bottom: 2px; }
-.proj-metric-col span span { font-weight: bold; color: #2980b9; }
-
-/* =========================================
-   TOP CONTROLS (Orizzontali)
-   ========================================= */
-.top-controls { grid-area: controls; background: #ffffff; border-bottom: 1px solid #ddd; border-right: 1px solid #ddd; padding: 10px 20px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; }
+.top-controls { grid-area: controls; background: #ffffff; padding: 8px 15px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.02); z-index: 5; margin-bottom: -5px; }
 .controls-left { display: flex; flex-direction: row; align-items: center; gap: 15px; }
-.control-label { color: #2c3e50; font-size: 0.95rem; }
+.control-label { color: #2c3e50; font-size: 0.9rem; }
 
-/* --- Segmented Control (Color Mode Switcher) --- */
-.segmented-control {
-    display: flex;
-    background-color: #e9ecef;
-    border-radius: 8px;
-    padding: 4px;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-}
-.segmented-control input[type="radio"] {
-    display: none; /* Nasconde i radio button reali */
-}
-.segmented-control label {
-    flex: 1;
-    text-align: center;
-    padding: 6px 20px; /* Aumentato il padding orizzontale per rendere lo switch più largo */
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #495057;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
-    user-select: none;
-    white-space: nowrap; /* Impedisce al testo di andare a capo */
-}
-.segmented-control input[type="radio"]:checked + label {
-    background-color: #ffffff;
-    color: #2980b9;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
+/* Segmented Control Switcher */
+.segmented-control { display: flex; background-color: #e9ecef; border-radius: 6px; padding: 3px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); }
+.segmented-control input[type="radio"] { display: none; }
+.segmented-control label { flex: 1; text-align: center; padding: 4px 12px; font-size: 0.85rem; font-weight: 600; color: #495057; border-radius: 4px; cursor: pointer; transition: all 0.2s ease-in-out; white-space: nowrap; }
+.segmented-control input[type="radio"]:checked + label { background-color: #ffffff; color: #2980b9; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
-/* Contenitore per la legenda. Altezza minima fissa per evitare salti nel layout
-   quando si cambia modalità di colore. */
-.controls-right { 
-    display: flex; 
-    flex-direction: column; 
-    justify-content: center; /* Centra verticalmente la legenda quando occupa meno spazio */
-    min-width: 250px; 
-    min-height: 40px; }
-#legend-gradient { height: 18px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
+.controls-right { display: flex; flex-direction: column; justify-content: center; min-width: 250px; }
+#legend-gradient { height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
 .legend-color-block { flex: 1; height: 100%; }
-.legend-cluster-item { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 0.85rem; font-weight: bold; }
-.legend-cluster-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #ccc; }
-.legend-labels { display: flex; justify-content: space-between; font-size: 0.75rem; margin-top: 4px; font-weight: bold; color: #555; }
+.legend-cluster-item { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: bold; }
+.legend-cluster-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #ccc; }
+.legend-labels { display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 4px; font-weight: bold; color: #555; }
 
 /* =========================================
-   MAIN STAGE (Centro - Scatterplots)
+   3 MAIN PANELS
    ========================================= */
-.main-stage { grid-area: main; display: flex; flex-direction: row; gap: 20px; padding: 20px; background: #eaeff1; overflow: hidden; }
-.plot-container { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden; }
-.plot-title { text-align: center; padding: 10px; font-weight: 600; border-bottom: 1px solid #eee; background: #fafafa; flex-shrink: 0; }
-.svg-container { flex: 1; position: relative; min-height: 0; width: 100%; padding: 0; display: flex; align-items: center; justify-content: center; }
+.plot-container { display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden; min-height: 0; }
+#panel-pca { grid-area: pca; margin-left: 12px; }
+#panel-mds { grid-area: mds; }
+#panel-dynamic { grid-area: neighbor; margin-right: 12px; }
+
+.plot-title { text-align: center; padding: 8px; font-size: 0.95rem; font-weight: 600; border-bottom: 1px solid #eee; background: #fafafa; flex-shrink: 0; color: #2c3e50; }
+.svg-container { flex: 1; position: relative; width: 100%; height: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 5px; }
 svg { width: 100%; height: 100%; display: block; }
 
 /* =========================================
-   LIVE ANALYTICS (Right Panel)
+   DYNAMIC PANEL (Gauges / Neighbor / Placeholder)
    ========================================= */
-.right-panel { grid-area: analytics; background: #ffffff; border-left: 1px solid #ddd; padding: 20px; overflow-y: auto; }
-.right-panel h3 { margin-top: 0; color: #2c3e50; }
-.help-text { font-size: 0.85rem; color: #7f8c8d; margin-bottom: 15px; }
-.hidden { display: none !important; }
+.dynamic-content-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.hidden-panel { display: none !important; }
 
-.stat-card { text-align: center; margin-bottom: 25px; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #eee; }
-.stat-card h4 { margin: 0 0 5px 0; color: #7f8c8d; font-size: 0.95rem; text-transform: uppercase; }
-.big-number { font-size: 2.5rem; font-weight: bold; margin: 0; color: #2c3e50; }
+/* Placeholder Styling */
+.placeholder-content { text-align: center; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 80%; }
+.placeholder-content p { margin: 0; font-weight: bold; font-size: 1.2rem; color: #2c3e50; }
+.placeholder-content span { font-size: 0.9rem; color: #7f8c8d; line-height: 1.4; }
 
-.quality-grid {
-    display: inline-grid;
-    grid-template-columns: 60px 1fr 1fr;
-    gap: 8px 15px;
-    font-size: 0.9rem;
-    text-align: left;
-}
-.quality-header { font-weight: bold; color: #2c3e50; font-size: 0.8rem; text-transform: uppercase; text-align: right; }
-.quality-label { font-weight: bold; color: #34495e; }
-.quality-value { font-weight: bold; color: #2980b9; text-align: right; font-size: 1rem; }
+/* Layout Gauges: ora in riga e più grandi */
+.stat-card { text-align: center; padding: 8px 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee; width: 80%; margin-bottom: 30px; }
+.stat-card h4 { margin: 0 0 2px 0; color: #7f8c8d; font-size: 0.8rem; text-transform: uppercase; }
+.big-number { font-size: 1.8rem; font-weight: bold; margin: 0; color: #2980b9; }
 
-.gauges-wrapper { display: flex; flex-direction: row; justify-content: space-between; gap: 10px; }
-.gauge-container { flex: 1; display: flex; flex-direction: column; align-items: center; text-align: center; background: #fff; padding: 10px 5px; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
-.gauge-container h4 { margin: 0 0 10px 0; color: #2c3e50; font-size: 0.8rem; text-transform: uppercase; }
-.gauge-label { font-size: 1.1rem; font-weight: bold; margin-top: 5px; color: #2980b9; }
-
-/* --- Neighbor Graph (Right Panel) --- */
-#neighbor-graph-svg {
-    width: 100%;
-    height: 320px; /* Fixed height for the graph */
-    border: 1px solid #f0f0f0;
-    border-radius: 8px;
-    background: #fcfcfc;
-}
-.neighbor-link {
-    stroke: #999;
-    stroke-opacity: 0.6;
-}
-.neighbor-node circle {
-    stroke: #fff;
-    stroke-width: 2px;
-    cursor: pointer;
-}
-.neighbor-node.center circle {
-    stroke: #f1c40f; /* Highlight the central node */
-    stroke-width: 4px;
-}
+/* Mette i tachimetri in orizzontale */
+.gauges-wrapper { display: flex; flex-direction: row; justify-content: space-around; align-items: flex-end; width: 100%; padding: 0 10px; }
+.gauge-container { display: flex; flex-direction: column; align-items: center; text-align: center; width: 32%; }
+.gauge-container h4 { margin: 0 0 5px 0; color: #2c3e50; font-size: 0.8rem; text-transform: uppercase; }
+.gauge-label { font-size: 1.05rem; font-weight: bold; margin-top: 5px; color: #2980b9; }
+/* Aumentata la dimensione massima */
+.gauge-container svg { height: auto; max-height: 65px; width: 100%; max-width: 120px; }
 
 /* =========================================
-   TOOLTIP
+   FOOTER (Card bianche pulite con bordi accento)
+   ========================================= */
+.footer-stats { grid-area: footer; display: flex; gap: 12px; margin: 0 12px; height: 100%; }
+.footer-btn { flex: 1; background-color: #ffffff; border-radius: 6px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); border: 1px solid #e1e8ed; border-top: 3px solid #3498db; }
+.fb-wide { flex: 2; border-top: 3px solid #2ca02c; /* Verde per far risaltare il messaggio globale */ }
+.footer-btn .fb-label { font-size: 0.7rem; text-transform: uppercase; color: #7f8c8d; font-weight: 600; margin-bottom: 2px; letter-spacing: 0.5px; }
+.footer-btn .fb-value { font-size: 1.1rem; font-weight: bold; color: #2c3e50; }
+.footer-btn .fb-message { font-size: 0.9rem; font-weight: 500; font-style: italic; color: #27ae60; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; }
+
+/* =========================================
+   TOOLTIP E NODI EXTRA
    ========================================= */
 #tooltip { position: absolute; opacity: 0; background: rgba(30, 40, 50, 0.95); color: white; padding: 12px; border-radius: 6px; pointer-events: none; font-size: 0.85rem; line-height: 1.5; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: opacity 0.1s ease; border-left: 4px solid #f1c40f; }
 #tooltip strong { color: #f1c40f; }
 .tt-diagnosis { margin-top: 8px; padding-top: 8px; border-top: 1px solid #555; font-style: italic; color: #ecf0f1; }
-
-/* =========================================
-   RESPONSIVE LAYOUT (per schermi più piccoli)
-   ========================================= */
-@media (max-width: 1280px) {
-    body {
-        height: auto;
-        min-height: 100vh;
-        overflow-y: auto;
-        overflow-x: hidden;
-    }
-
-    #app-grid {
-        grid-template-columns: 1fr; /* Colonna singola */
-        grid-template-rows: auto auto 1fr auto; /* Adatta le righe per lo stacking */
-        grid-template-areas:
-            "header"
-            "controls"
-            "main"
-            "analytics";
-        height: auto; /* L'altezza si adatta al contenuto */
-    }
-
-    .right-panel {
-        border-left: none; /* Rimuove il bordo laterale */
-        border-top: 2px solid #ddd; /* Aggiunge un separatore in alto */
-        overflow-y: visible; /* Disabilita lo scroll interno al pannello */
-        padding-top: 25px;
-    }
-
-    .main-stage {
-        flex-direction: column; /* Impila i grafici verticalmente */
-    }
-
-    .top-controls {
-        flex-direction: column; /* Impila i controlli */
-        align-items: flex-start; /* Allinea a sinistra */
-        gap: 15px;
-    }
-}
+.neighbor-link { stroke: #999; stroke-width: 1.5px; stroke-opacity: 0.7; }
+.neighbor-node circle { stroke: #fff; stroke-width: 2px; cursor: pointer; }
+.neighbor-node.center circle { stroke: #f1c40f; stroke-width: 4px; }

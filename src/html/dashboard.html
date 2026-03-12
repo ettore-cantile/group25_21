@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DR Quality & Artifacts Dashboard</title>
+    <title>DR Quality Dashboard</title>
     <link rel="stylesheet" href="../css/dashboard.css">
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
@@ -14,23 +14,6 @@
             <div>
                 <h1>Dimensionality Reduction Quality</h1>
                 <p class="subtitle">Comparing PCA and Euclidean MDS via Relationship Metrics</p>
-            </div>
-            
-            <div class="header-stats">
-                <div id="global-assessment" class="assessment-box"></div>
-                
-                <div class="projection-metrics">
-                    <div class="proj-metric-col">
-                        <strong>PCA Global</strong>
-                        <span>Trust: <span id="val-pca-trust">0%</span></span>
-                        <span>Cont: <span id="val-pca-cont">0%</span></span>
-                    </div>
-                    <div class="proj-metric-col">
-                        <strong>MDS Global</strong>
-                        <span>Trust: <span id="val-mds-trust">0%</span></span>
-                        <span>Cont: <span id="val-mds-cont">0%</span></span>
-                    </div>
-                </div>
             </div>
         </header>
 
@@ -44,7 +27,7 @@
                     <label><input type="radio" name="colorMode" value="fscore"> F-Score (RdYlGn)</label>
                 </div>
 
-                <div style="width: 1px; height: 20px; background-color: #ddd;"></div>
+                <div style="width: 1px; height: 20px; background-color: #ddd; margin: 0 10px;"></div>
                 <span class="control-label"><strong>Size:</strong></span>
                 <input type="range" id="point-size-slider" min="2" max="12" value="5" step="1" style="width: 80px; cursor: pointer;">
             </div>
@@ -57,48 +40,93 @@
             </div>
         </section>
 
-        <main class="main-stage">
-            <div class="plot-container">
-                <div class="plot-title">PCA Projection</div>
-                <div id="pca-plot" class="svg-container"></div>
-            </div>
-            <div class="plot-container">
-                <div class="plot-title">Euclidean MDS Projection</div>
-                <div id="mds-plot" class="svg-container"></div>
-            </div>
-        </main>
+        <div class="plot-container" id="panel-pca">
+            <div class="plot-title">PCA Projection</div>
+            <div id="pca-plot" class="svg-container"></div>
+        </div>
+        
+        <div class="plot-container" id="panel-mds">
+            <div class="plot-title">Euclidean MDS Projection</div>
+            <div id="mds-plot" class="svg-container"></div>
+        </div>
 
-        <aside class="right-panel">
-            <h3>Live Analytics</h3>
-            <p class="help-text">Hover, click, or brush to analyze.</p>
+        <div class="plot-container" id="panel-dynamic">
+            <div class="plot-title" id="dynamic-panel-title">Live Analytics</div>
             
-            <div id="brush-stats" class="hidden">
-                <div class="stat-card">
-                    <h4>Selected Points</h4>
-                    <p class="big-number" id="stat-count">0</p>
+            <div class="svg-container" id="dynamic-svg-box" style="padding: 10px;">
+                
+                <div id="empty-state-placeholder" class="dynamic-content-wrapper">
+                    <div class="placeholder-content">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        <p>No Points Selected</p>
+                        <span>Hover, click, or brush on the scatterplots to analyze local quality and relationships.</span>
+                    </div>
+                </div>
+
+                <div id="gauges-container" class="dynamic-content-wrapper hidden-panel">
+                    <div class="stat-card">
+                        <h4>Selected Points</h4>
+                        <p class="big-number" id="stat-count">0</p>
+                    </div>
+                    
+                    <div class="gauges-wrapper">
+                        <div class="gauge-container">
+                            <h4>Precision</h4>
+                            <svg id="gauge-precision"></svg>
+                            <div id="val-precision" class="gauge-label">0%</div>
+                        </div>
+
+                        <div class="gauge-container">
+                            <h4>Recall</h4>
+                            <svg id="gauge-recall"></svg>
+                            <div id="val-recall" class="gauge-label">0%</div>
+                        </div>
+
+                        <div class="gauge-container">
+                            <h4>F-Score</h4>
+                            <svg id="gauge-fscore"></svg>
+                            <div id="val-fscore" class="gauge-label">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="neighbor-graph-container" class="dynamic-content-wrapper hidden-panel">
+                    <svg id="neighbor-graph-svg" style="width: 100%; height: 100%;"></svg>
                 </div>
                 
-                <div class="gauges-wrapper">
-                    <div class="gauge-container">
-                        <h4>Precision</h4>
-                        <svg id="gauge-precision"></svg>
-                        <div id="val-precision" class="gauge-label">0%</div>
-                    </div>
-
-                    <div class="gauge-container">
-                        <h4>Recall</h4>
-                        <svg id="gauge-recall"></svg>
-                        <div id="val-recall" class="gauge-label">0%</div>
-                    </div>
-
-                    <div class="gauge-container">
-                        <h4>F-Score</h4>
-                        <svg id="gauge-fscore"></svg>
-                        <div id="val-fscore" class="gauge-label">0%</div>
-                    </div>
-                </div>
             </div>
-        </aside>
+        </div>
+
+        <footer class="footer-stats" id="global-footer">
+            <div class="footer-btn">
+                <div class="fb-label">Dataset</div>
+                <div class="fb-value" id="fb-dataset">-</div>
+            </div>
+            <div class="footer-btn">
+                <div class="fb-label">PCA Trust</div>
+                <div class="fb-value" id="fb-pca-trust">-</div>
+            </div>
+            <div class="footer-btn">
+                <div class="fb-label">PCA Cont</div>
+                <div class="fb-value" id="fb-pca-cont">-</div>
+            </div>
+            <div class="footer-btn">
+                <div class="fb-label">MDS Trust</div>
+                <div class="fb-value" id="fb-mds-trust">-</div>
+            </div>
+            <div class="footer-btn">
+                <div class="fb-label">MDS Cont</div>
+                <div class="fb-value" id="fb-mds-cont">-</div>
+            </div>
+            <div class="footer-btn fb-wide">
+                <div class="fb-label">Global Assessment</div>
+                <div class="fb-value fb-message" id="fb-assessment">-</div>
+            </div>
+        </footer>
     </div>
 
     <div id="tooltip"></div>
