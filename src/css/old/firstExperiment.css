@@ -1,4 +1,4 @@
-/* LAYOUT & STILI BASE */
+/* LAYOUT & BASE STYLES */
 body { 
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
     background-color: #f4f6f8; 
@@ -24,7 +24,7 @@ h1 { margin: 0; font-size: 1.4rem; color: #2c3e50; }
 .subtitle { font-size: 0.9rem; color: #7f8c8d; }
 .header-controls { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 
-/* CONTROLLI (I Bottoni) */
+/* CONTROLS (Buttons) */
 .controls { display: flex; gap: 10px; background: #ecf0f1; padding: 5px; border-radius: 8px; }
 button { 
     border: none; 
@@ -39,12 +39,12 @@ button.active { background: #3498db; color: white; box-shadow: 0 2px 5px rgba(0,
 button:not(.active) { background: transparent; color: #7f8c8d; }
 button:not(.active):hover { background: #e0e0e0; color: #333; }
 
-/* LEGENDA DI BASE */
+/* BASIC LEGEND */
 .legend-container { display: flex; align-items: center; gap: 15px; font-size: 0.85rem; margin-top: 5px; }
 .legend-box { display: flex; align-items: center; gap: 5px; }
 .color-dot { width: 12px; height: 12px; border-radius: 50%; }
 
-/* LEGENDA DISCRETA COLORBREWER (NOVITÀ AGGIUNTA PRIMA) */
+/* COLORBREWER DISCRETE LEGEND */
 .discrete-bar {
     display: flex;
     width: 150px;
@@ -80,25 +80,25 @@ button:not(.active):hover { background: #e0e0e0; color: #333; }
 .chart-title { position: absolute; top: 15px; left: 20px; font-weight: bold; color: #34495e; }
 .chart-area { margin-top: 20px; width: 100%; height: 100%; }
 
-/* GRAFICI (Elementi SVG) */
-/* --- MODIFICATO: Aggiunto bordo scuro e più spesso per visibilità --- */
+/* CHARTS (SVG Elements) */
+/* --- Dark border for visibility --- */
 circle { 
-    stroke: #333;            /* Grigio scuro invece di bianco */
-    stroke-width: 1px;       /* Spessore aumentato */
+    stroke: #333;            /* Dark gray instead of white */
+    stroke-width: 1px;       /* Increased width */
     transition: fill 0.5s, r 0.2s, stroke 0.2s; 
     cursor: crosshair; 
 }
 
-/* Quando si passa il mouse, il bordo diventa ancora più spesso */
+/* On hover, border becomes thicker */
 circle.hovered { 
-    stroke: #000;            /* Nero puro */
+    stroke: #000;            /* Pure black */
     stroke-width: 2px; 
     r: 9px; 
     z-index: 999; 
 }
 circle.dimmed { opacity: 0.1; }
 
-/* STATISTICHE BAR (NOVITÀ AGGIUNTA PRIMA) */
+/* STATS BAR */
 .stats-bar {
     display: flex;
     justify-content: center;
@@ -118,7 +118,7 @@ circle.dimmed { opacity: 0.1; }
 }
 .stat-value.highlight { font-weight: bold; color: #27ae60; }
 
-/* LINEE DEI VICINI (R13) (NOVITÀ AGGIUNTA PRIMA) */
+/* NEIGHBOR LINES (R13) */
 .link-line {
     stroke: #2c3e50;
     stroke-width: 1.5px;

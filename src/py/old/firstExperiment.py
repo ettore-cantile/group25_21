@@ -13,7 +13,7 @@ OUTPUT_FILE = os.path.abspath(os.path.join(SCRIPT_DIR, '../../dataset/firstExper
 CSV_FILENAME = os.path.abspath(os.path.join(SCRIPT_DIR, '../../dataset/wine.csv'))
 TARGET_COLUMN = 'Producer'
 
-print(f"Caricamento dataset...")
+print(f"Loading dataset...")
 try:
     df = pd.read_csv(CSV_FILENAME)
     df = df.dropna()
@@ -56,12 +56,12 @@ TOLERANCE = 0.10 * N
 pca_matches = np.sum(np.abs(score_pca) <= TOLERANCE) / N * 100
 mds_matches = np.sum(np.abs(score_mds) <= TOLERANCE) / N * 100
 
-# --- NOVITÀ: Trova i 5 vicini più prossimi in R13 ---
+# --- Find the 5 nearest neighbors in R13 ---
 K = 5
-# argsort ordina le distanze crescenti. [:, 1:K+1] prende dal 1° al 5° (escludendo lo 0, che è il punto stesso)
+# argsort sorts distances ascending. [:, 1:K+1] takes 1st to 5th (excluding 0, which is the point itself)
 neighbors_R13 = np.argsort(D_high, axis=1)[:, 1:K+1].tolist()
 
-# Struttura JSON aggiornata con le Statistiche e i Vicini
+# JSON structure updated with Statistics and Neighbors
 export_data = {
     "stats": {
         "pca_global": round(global_pca, 2),
@@ -82,10 +82,10 @@ for i in range(N):
         "score_pca": float(score_pca[i]),
         "score_mds": float(score_mds[i]),
         "class_name": class_names[i],
-        "neighbors": neighbors_R13[i] # Lista degli ID dei vicini reali
+        "neighbors": neighbors_R13[i] # List of real neighbor IDs
     })
 
 os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 with open(OUTPUT_FILE, 'w') as f:
     json.dump(export_data, f, indent=4)
-print(f"Esportazione completata in {OUTPUT_FILE}")
+print(f"Export completed in {OUTPUT_FILE}")

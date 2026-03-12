@@ -1,22 +1,34 @@
 /* =========================================
-   RESET E IMPOSTAZIONI GLOBALI
+   RESET AND GLOBAL SETTINGS
    ========================================= */
-* { box-sizing: border-box; }
-body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #eaeff1; color: #333; }
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #eaeff1;
+    color: #333;
+}
 
 /* =========================================
-   LAYOUT PRINCIPALE (CSS GRID)
+   MAIN LAYOUT (CSS GRID)
    ========================================= */
-#app-grid { 
-    display: grid; 
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); 
-    grid-template-rows: auto auto minmax(0, 1fr) 50px; 
-    grid-template-areas: 
+#app-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) 50px;
+    grid-template-areas:
         "header header"
         "controls controls"
         "plots analytics"
         "footer footer";
-    height: 100vh; 
+    height: 100vh;
     width: 100vw;
     gap: 12px;
     padding-bottom: 12px;
@@ -25,47 +37,136 @@ body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; fon
 /* =========================================
    HEADER & CONTROLS
    ========================================= */
-.header { grid-area: header; background-color: #ffffff; border-bottom: 1px solid #ddd; padding: 8px 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.02); z-index: 10; }
-h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; }
-.subtitle { margin: 0; font-size: 0.8rem; color: #7f8c8d; }
-
-.top-controls { 
-    grid-area: controls; 
-    background: #ffffff; 
-    padding: 8px 15px; 
-    display: flex; 
-    flex-direction: row; 
-    align-items: center; 
-    justify-content: space-between; 
-    box-shadow: 0 2px 5px rgba(0,0,0,0.02); 
-    z-index: 5; 
-    margin-bottom: -5px; 
-    height: 55px; /* ALTEZZA FISSA: Impedisce i salti di layout */
+.header {
+    grid-area: header;
+    background-color: #ffffff;
+    border-bottom: 1px solid #ddd;
+    padding: 8px 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+    z-index: 10;
 }
-.controls-left { display: flex; flex-direction: row; align-items: center; gap: 15px; }
-.control-label { color: #2c3e50; font-size: 0.9rem; }
+
+h1 {
+    margin: 0;
+    font-size: 1.15rem;
+    color: #2c3e50;
+}
+
+.subtitle {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #7f8c8d;
+}
+
+.top-controls {
+    grid-area: controls;
+    background: #ffffff;
+    padding: 8px 15px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
+    z-index: 5;
+    margin-bottom: -5px;
+    height: 55px; /* FIXED HEIGHT: Prevents layout shifts */
+}
+
+.controls-left {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 15px;
+}
+
+.control-label {
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
 
 /* Segmented Control Switcher */
-.segmented-control { display: flex; background-color: #e9ecef; border-radius: 6px; padding: 3px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); }
-.segmented-control input[type="radio"] { display: none; }
-.segmented-control label { flex: 1; text-align: center; padding: 4px 12px; font-size: 0.85rem; font-weight: 600; color: #495057; border-radius: 4px; cursor: pointer; transition: all 0.2s ease-in-out; white-space: nowrap; }
-.segmented-control input[type="radio"]:checked + label { background-color: #ffffff; color: #2980b9; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-
-.controls-right { 
-    display: flex; 
-    flex-direction: column; 
-    justify-content: center; 
-    min-width: 250px; 
-    height: 100%; /* Si adatta perfettamente all'altezza fissa del genitore */
+.segmented-control {
+    display: flex;
+    background-color: #e9ecef;
+    border-radius: 6px;
+    padding: 3px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
 }
-#legend-gradient { height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
-.legend-color-block { flex: 1; height: 100%; }
-.legend-cluster-item { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: bold; }
-.legend-cluster-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #ccc; }
-.legend-labels { display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 4px; font-weight: bold; color: #555; }
+
+.segmented-control input[type="radio"] {
+    display: none;
+}
+
+.segmented-control label {
+    flex: 1;
+    text-align: center;
+    padding: 4px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #495057;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    white-space: nowrap;
+}
+
+.segmented-control input[type="radio"]:checked + label {
+    background-color: #ffffff;
+    color: #2980b9;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.controls-right {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 250px;
+    height: 100%; /* Fits perfectly into parent fixed height */
+}
+
+#legend-gradient {
+    height: 16px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.legend-color-block {
+    flex: 1;
+    height: 100%;
+}
+
+.legend-cluster-item {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.legend-cluster-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid #ccc;
+}
+
+.legend-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    margin-top: 4px;
+    font-weight: bold;
+    color: #555;
+}
 
 /* =========================================
-   GRIGLIA PLOT 2x2 (A Sinistra)
+   PLOT GRID 2x2 (Left)
    ========================================= */
 #plots-grid {
     grid-area: plots;
@@ -75,53 +176,248 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; }
     gap: 12px;
     margin-left: 12px;
     height: 100%;
-    width: calc(100% - 12px); 
+    width: calc(100% - 12px);
 }
 
-.plot-container { display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden; min-height: 0; min-width: 0; }
-.plot-title { text-align: center; padding: 8px; font-size: 0.95rem; font-weight: 600; border-bottom: 1px solid #eee; background: #fafafa; flex-shrink: 0; color: #2c3e50; }
+.plot-container {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    min-height: 0;
+    min-width: 0;
+}
 
-.svg-container { flex: 1; position: relative; width: 100%; height: 100%; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 0; overflow: hidden; }
-svg { width: 100%; height: 100%; display: block; }
+.plot-title {
+    text-align: center;
+    padding: 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-bottom: 1px solid #eee;
+    background: #fafafa;
+    flex-shrink: 0;
+    color: #2c3e50;
+}
+
+.svg-container {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    overflow: hidden;
+}
+
+svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
 
 /* =========================================
-   DYNAMIC PANEL (A Destra)
+   DYNAMIC PANEL (Right)
    ========================================= */
-#panel-dynamic { grid-area: analytics; margin-right: 12px; }
+#panel-dynamic {
+    grid-area: analytics;
+    margin-right: 12px;
+}
 
-.dynamic-content-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; }
-.hidden-panel { display: none !important; }
+.dynamic-content-wrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.hidden-panel {
+    display: none !important;
+}
 
 /* Placeholder Styling */
-.placeholder-content { text-align: center; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; max-width: 80%; }
-.placeholder-content p { margin: 0; font-weight: bold; font-size: 1.2rem; color: #2c3e50; }
-.placeholder-content span { font-size: 0.9rem; color: #7f8c8d; line-height: 1.4; }
+.placeholder-content {
+    text-align: center;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    max-width: 80%;
+}
+
+.placeholder-content p {
+    margin: 0;
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: #2c3e50;
+}
+
+.placeholder-content span {
+    font-size: 0.9rem;
+    color: #7f8c8d;
+    line-height: 1.4;
+}
 
 /* Layout Gauges */
-.stat-card { text-align: center; padding: 8px 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee; width: 80%; margin-bottom: 30px; }
-.stat-card h4 { margin: 0 0 2px 0; color: #7f8c8d; font-size: 0.8rem; text-transform: uppercase; }
-.big-number { font-size: 1.8rem; font-weight: bold; margin: 0; color: #2980b9; }
+.stat-card {
+    text-align: center;
+    padding: 8px 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #eee;
+    width: 80%;
+    margin-bottom: 30px;
+}
 
-.gauges-wrapper { display: flex; flex-direction: row; justify-content: space-around; align-items: flex-end; width: 100%; padding: 0 10px; }
-.gauge-container { display: flex; flex-direction: column; align-items: center; text-align: center; width: 32%; }
-.gauge-container h4 { margin: 0 0 5px 0; color: #2c3e50; font-size: 0.8rem; text-transform: uppercase; }
-.gauge-label { font-size: 1.05rem; font-weight: bold; margin-top: 5px; color: #2980b9; }
-.gauge-container svg { height: auto; max-height: 65px; width: 100%; max-width: 120px; }
+.stat-card h4 {
+    margin: 0 0 2px 0;
+    color: #7f8c8d;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.big-number {
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin: 0;
+    color: #2980b9;
+}
+
+.gauges-wrapper {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: flex-end;
+    width: 100%;
+    padding: 0 10px;
+}
+
+.gauge-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    width: 32%;
+}
+
+.gauge-container h4 {
+    margin: 0 0 5px 0;
+    color: #2c3e50;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.gauge-label {
+    font-size: 1.05rem;
+    font-weight: bold;
+    margin-top: 5px;
+    color: #2980b9;
+}
+
+.gauge-container svg {
+    height: auto;
+    max-height: 65px;
+    width: 100%;
+    max-width: 120px;
+}
 
 /* =========================================
-   FOOTER (Card bianche pulite con bordi accento)
+   FOOTER (Clean white cards with accent borders)
    ========================================= */
-.footer-stats { grid-area: footer; display: flex; gap: 12px; margin: 0 12px; height: 100%; }
-.footer-btn { flex: 1; background-color: #ffffff; border-radius: 6px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); border: 1px solid #e1e8ed; border-top: 3px solid #3498db; overflow: hidden; }
-.footer-btn .fb-label { font-size: 0.7rem; text-transform: uppercase; color: #7f8c8d; font-weight: 600; margin-bottom: 2px; letter-spacing: 0.5px; line-height: 1.2; }
-.footer-btn .fb-value { font-size: 1.1rem; font-weight: bold; color: #2c3e50; }
+.footer-stats {
+    grid-area: footer;
+    display: flex;
+    gap: 12px;
+    margin: 0 12px;
+    height: 100%;
+}
+
+.footer-btn {
+    flex: 1;
+    background-color: #ffffff;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 6px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e1e8ed;
+    border-top: 3px solid #3498db;
+    overflow: hidden;
+}
+
+.footer-btn .fb-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: #7f8c8d;
+    font-weight: 600;
+    margin-bottom: 2px;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+}
+
+.footer-btn .fb-value {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #2c3e50;
+}
 
 /* =========================================
-   TOOLTIP E NODI EXTRA
+   TOOLTIP AND EXTRA NODES
    ========================================= */
-#tooltip { position: absolute; opacity: 0; background: rgba(30, 40, 50, 0.95); color: white; padding: 12px; border-radius: 6px; pointer-events: none; font-size: 0.85rem; line-height: 1.5; z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: opacity 0.1s ease; border-left: 4px solid #f1c40f; }
-#tooltip strong { color: #f1c40f; }
-.tt-diagnosis { margin-top: 8px; padding-top: 8px; border-top: 1px solid #555; font-style: italic; color: #ecf0f1; }
-.neighbor-link { stroke: #999; stroke-width: 1.5px; stroke-opacity: 0.7; }
-.neighbor-node circle { stroke: #fff; stroke-width: 2px; cursor: pointer; }
-.neighbor-node.center circle { stroke: #f1c40f; stroke-width: 4px; }
+#tooltip {
+    position: absolute;
+    opacity: 0;
+    background: rgba(30, 40, 50, 0.95);
+    color: white;
+    padding: 12px;
+    border-radius: 6px;
+    pointer-events: none;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transition: opacity 0.1s ease;
+    border-left: 4px solid #f1c40f;
+}
+
+#tooltip strong {
+    color: #f1c40f;
+}
+
+.tt-diagnosis {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #555;
+    font-style: italic;
+    color: #ecf0f1;
+}
+
+.neighbor-link {
+    stroke: #999;
+    stroke-width: 1.5px;
+    stroke-opacity: 0.7;
+}
+
+.neighbor-node circle {
+    stroke: #fff;
+    stroke-width: 2px;
+    cursor: pointer;
+}
+
+.neighbor-node.center circle {
+    stroke: #f1c40f;
+    stroke-width: 4px;
+}

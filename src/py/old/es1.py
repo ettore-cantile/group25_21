@@ -15,9 +15,9 @@ OUTPUT_FILE = os.path.join(SCRIPT_DIR, '../dataset/wine_data.json')
 CSV_FILENAME = os.path.join(SCRIPT_DIR, '../dataset/wine.csv')
 TARGET_COLUMN = 'Producer'
 
-# Imposta il numero di vicini da considerare (K)
-# Un buon valore di default è solitamente tra 5 e 15 a seconda del dataset
-K_NEIGHBORS = 10 
+# Set the number of neighbors to consider (K)
+# A good default value is usually between 5 and 15 depending on the dataset
+K_NEIGHBORS = 10
 
 # ==========================================
 # 2. DATA LOADING & PREPARATION
@@ -66,11 +66,11 @@ print("Computing advanced distortion scores (FP & FN weights)...")
 def calculate_knn_distortion(D_high, D_low, K):
     N = D_high.shape[0]
     
-    # Riempiamo la diagonale con infinito per non contare un punto come vicino di se stesso
+    # Fill diagonal with infinity to avoid counting a point as its own neighbor
     np.fill_diagonal(D_high, np.inf)
     np.fill_diagonal(D_low, np.inf)
 
-    # Calcoliamo i ranghi (le "classifiche"). argsort(argsort) restituisce il rango di ogni elemento
+    # Calculate ranks (rankings). argsort(argsort) returns the rank of each element
     R_high = np.argsort(np.argsort(D_high, axis=1), axis=1)
     R_low = np.argsort(np.argsort(D_low, axis=1), axis=1)
 
@@ -78,37 +78,37 @@ def calculate_knn_distortion(D_high, D_low, K):
     score_fn = np.zeros(N)
 
     for i in range(N):
-        # Indici dei K-vicini nello spazio ad alta dimensionalità (Originale)
+        # Indices of K-neighbors in high-dimensional space (Original)
         U_i = set(np.where(R_high[i] < K)[0])
-        # Indici dei K-vicini nello spazio a bassa dimensionalità (2D)
+        # Indices of K-neighbors in low-dimensional space (2D)
         V_i = set(np.where(R_low[i] < K)[0])
 
-        # Falsi Positivi: Punti che sono vicini nel 2D ma non lo erano in origine
+        # False Positives: Points that are close in 2D but were not originally
         fp_indices = list(V_i - U_i)
         if fp_indices:
-            # Il peso è quanto erano lontani in origine rispetto a K
+            # Weight is how far they were originally relative to K
             score_fp[i] = np.sum(R_high[i, fp_indices] - K)
 
-        # Falsi Negativi: Punti che erano vicini in origine ma sono lontani nel 2D
+        # False Negatives: Points that were close originally but are far in 2D
         fn_indices = list(U_i - V_i)
         if fn_indices:
-            # Il peso è quanto sono stati allontanati nel 2D rispetto a K
+            # Weight is how far they were moved away in 2D relative to K
             score_fn[i] = np.sum(R_low[i, fn_indices] - K)
 
-    # Indice divergente: Positivo = dominante Falsi Positivi, Negativo = dominante Falsi Negativi
+    # Divergent index: Positive = False Positives dominant, Negative = False Negatives dominant
     point_scores = score_fp - score_fn
     
-    # Punteggio Globale dell'algoritmo (Somma di tutti gli errori)
+    # Global Algorithm Score (Sum of all errors)
     global_score = np.sum(score_fp) + np.sum(score_fn)
     
     return point_scores, global_score
 
-# Calcolo distanze euclidee
+# Calculate Euclidean distances
 D_high = euclidean_distances(X_scaled)
 D_pca = euclidean_distances(X_pca)
 D_mds = euclidean_distances(X_mds)
 
-# Calcolo scores
+# Calculate scores
 score_pca, global_pca = calculate_knn_distortion(D_high.copy(), D_pca.copy(), K=K_NEIGHBORS)
 score_mds, global_mds = calculate_knn_distortion(D_high.copy(), D_mds.copy(), K=K_NEIGHBORS)
 
@@ -132,12 +132,12 @@ for i in range(len(X)):
         "pca_y": float(X_pca[i, 1]),
         "mds_x": float(X_mds[i, 0]),
         "mds_y": float(X_mds[i, 1]),
-        "score_pca": float(score_pca[i]), # Usare per la Color Scale divergente (Blu > 0, Rosso < 0)
-        "score_mds": float(score_mds[i]), # Usare per la Color Scale divergente
+        "score_pca": float(score_pca[i]), # Use for divergent Color Scale (Blue > 0, Red < 0)
+        "score_mds": float(score_mds[i]), # Use for divergent Color Scale
         "class_name": class_names[i]
     })
 
-# Assicurati che la cartella di destinazione esista
+# Ensure the destination folder exists
 os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
 
 with open(OUTPUT_FILE, 'w') as f:

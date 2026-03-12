@@ -1,45 +1,45 @@
 // ==========================================
-// 1. VARIABILI GLOBALI E SETUP
+// 1. GLOBAL VARIABLES AND SETUP
 // ==========================================
 let globalData = [];
 let globalStats = {};
-let currentMode = 'error'; // Modalità di default: mostra gli errori (Falsi Positivi/Negativi)
+let currentMode = 'error'; // Default mode: show errors (False Positives/Negatives)
 let colorScaleError;
 const colorScaleClass = d3.scaleOrdinal(d3.schemeCategory10);
 
-// Dizionario per salvare le scale (x, y) di entrambi i grafici per poterci disegnare le linee
+// Dictionary to save scales (x, y) of both charts to draw lines
 const chartScales = { pca: null, mds: null };
 
-// Percorso del JSON (Relativo alla posizione dell'HTML in ./src/html/)
+// JSON Path (Relative to HTML location in ./src/html/)
 const DATA_URL = "../../dataset/firstExperiment.json";
 
 // ==========================================
-// 2. CARICAMENTO DATI (D3.js)
+// 2. DATA LOADING (D3.js)
 // ==========================================
 d3.json(DATA_URL).then(function(data) {
-    // Il JSON è diviso in data.stats e data.points
+    // JSON is divided into data.stats and data.points
     globalData = data.points;
     globalStats = data.stats;
     
-    // --- POPOLAMENTO STATISTICHE NELLA DASHBOARD ---
+    // --- POPULATE DASHBOARD STATISTICS ---
     d3.select("#stat-pca-err").text(globalStats.pca_global);
     d3.select("#stat-pca-match").text(globalStats.pca_matches);
     d3.select("#stat-mds-err").text(globalStats.mds_global);
     d3.select("#stat-mds-match").text(globalStats.mds_matches);
     
-    // --- SCALA DISCRETA PER L'ERRORE (ColorBrewer RdBu 7-classi) ---
-    // [Rosso Scuro, Rosso, Rosso Chiaro, Neutro(Grigio), Blu Chiaro, Blu, Blu Scuro]
+    // --- DISCRETE ERROR SCALE (ColorBrewer RdBu 7-classes) ---
+    // [Dark Red, Red, Light Red, Neutral(Gray), Light Blue, Blue, Dark Blue]
     const colorBrewerRdBu7 = ["#b2182b", "#ef8a62", "#fddbc7", "#f7f7f7", "#d1e5f0", "#67a9cf", "#2166ac"];
 
-    // Trova l'errore massimo assoluto per centrare la scala su 0
+    // Find max absolute error to center scale on 0
     const maxAbsScore = d3.max(globalData, d => Math.max(Math.abs(d.score_pca), Math.abs(d.score_mds)));
     
-    // scaleQuantize divide automaticamente il dominio in 7 "fasce" o "scalini" perfetti
+    // scaleQuantize automatically divides domain into 7 perfect "steps"
     colorScaleError = d3.scaleQuantize()
         .domain([-maxAbsScore, maxAbsScore]) 
         .range(colorBrewerRdBu7);
 
-    // Disegniamo dinamicamente i blocchetti nella legenda HTML per la scala discreta
+    // Dynamically draw blocks in HTML legend for discrete scale
     const legendBar = d3.select("#discrete-error-legend");
     legendBar.html(""); 
     colorBrewerRdBu7.forEach(color => {
@@ -48,7 +48,7 @@ d3.json(DATA_URL).then(function(data) {
             .style("background-color", color);
     });
 
-    // --- SETUP LEGENDA CLASSI (Vini) ---
+    // --- SETUP CLASS LEGEND (Wines) ---
     const classes = [...new Set(globalData.map(d => d.class_name))].sort();
     const legendClassDiv = d3.select("#legend-class");
     classes.forEach(c => {
@@ -57,29 +57,29 @@ d3.json(DATA_URL).then(function(data) {
         box.append("span").text(c);
     });
 
-    // Disegna i grafici per la prima volta
+    // Draw charts for the first time
     drawCharts();
     
 }).catch(err => {
-    console.error("Errore caricamento D3:", err);
-    alert("Errore nel caricamento del JSON.\nHai avviato il server Python locale? (es. python -m http.server)");
+    console.error("D3 loading error:", err);
+    alert("Error loading JSON.\nDid you start the local Python server? (e.g., python -m http.server)");
 });
 
 // ==========================================
-// 3. GESTIONE INTERFACCIA E MODALITÀ
+// 3. INTERFACE AND MODE MANAGEMENT
 // ==========================================
 function setMode(mode) {
     currentMode = mode;
     
-    // Aggiorna UI Bottoni
+    // Update Button UI
     d3.selectAll("button").classed("active", false);
     d3.select("#btn-" + mode).classed("active", true);
     
-    // Mostra/Nascondi le legende corrette
+    // Show/Hide correct legends
     d3.select("#legend-error").style("display", mode === 'error' ? 'flex' : 'none');
     d3.select("#legend-class").style("display", mode === 'class' ? 'flex' : 'none');
     
-    // Anima il cambio di colore dei punti
+    // Animate point color change
     d3.select("#chart-pca").selectAll("circle").transition().duration(500)
         .attr("fill", d => currentMode === 'error' ? colorScaleError(d.score_pca) : colorScaleClass(d.class_name));
         
@@ -88,7 +88,7 @@ function setMode(mode) {
 }
 
 // ==========================================
-// 4. DISEGNO DEI GRAFICI
+// 4. DRAWING CHARTS
 // ==========================================
 function drawCharts() {
     drawScatter("#chart-pca", "pca", "score_pca", "container-pca");
@@ -99,14 +99,14 @@ function drawScatter(selector, type, scoreProp, containerId) {
     const container = document.getElementById(containerId);
     const rect = container.getBoundingClientRect();
     
-    // Preveniamo il bug dell'altezza negativa in caso di caricamento CSS ritardato
+    // Prevent negative height bug in case of delayed CSS loading
     const w = Math.max(300, rect.width - 40);
     const h = Math.max(340, rect.height - 60); 
     
     const xProp = type + "_x";
     const yProp = type + "_y";
 
-    // Pulisce l'SVG precedente in caso di ridimensionamento della finestra
+    // Clean previous SVG on window resize
     d3.select(selector).html("");
 
     const svg = d3.select(selector).append("svg")
@@ -114,22 +114,22 @@ function drawScatter(selector, type, scoreProp, containerId) {
         .attr("height", h)
         .style("overflow", "visible"); 
     
-    // Scale (adattate sui dati min e max)
+    // Scales (adapted to min and max data)
     const x = d3.scaleLinear().domain(d3.extent(globalData, d => d[xProp])).nice().range([30, w-20]);
     const y = d3.scaleLinear().domain(d3.extent(globalData, d => d[yProp])).nice().range([h-30, 20]);
 
-    // Salviamo le scale globalmente per usarle poi per tracciare le linee dei vicini
+    // Save scales globally to use them later for neighbor lines
     chartScales[type] = { x: x, y: y };
 
-    // Disegno degli Assi
+    // Draw Axes
     svg.append("g").attr("transform", `translate(0,${h-30})`).call(d3.axisBottom(x).ticks(5));
     svg.append("g").attr("transform", `translate(30,0)`).call(d3.axisLeft(y).ticks(5));
 
-    // Creiamo due layer per evitare che le linee coprano i cerchi
+    // Create two layers to prevent lines from covering circles
     const linksLayer = svg.append("g").attr("class", "links-layer");
     const nodesLayer = svg.append("g").attr("class", "nodes-layer");
 
-    // Disegno dei Punti (Nodi)
+    // Draw Points (Nodes)
     nodesLayer.selectAll("circle")
         .data(globalData)
         .enter().append("circle")
@@ -139,19 +139,19 @@ function drawScatter(selector, type, scoreProp, containerId) {
         .attr("fill", d => currentMode === 'error' ? colorScaleError(d[scoreProp]) : colorScaleClass(d.class_name))
         .attr("class", d => "dot-" + d.id)
         
-        // --- INTERAZIONI: Brushing, Linking e Tooltip ---
+        // --- INTERACTIONS: Brushing, Linking and Tooltip ---
         .on("mouseover", function(event, d) {
-            // Evidenzia lo stesso punto su entrambi i grafici
+            // Highlight same point on both charts
             d3.selectAll(".dot-" + d.id).classed("hovered", true).raise();
             
-            // Attenua tutti gli altri punti
+            // Dim all other points
             d3.selectAll("circle:not(.dot-" + d.id + ")").classed("dimmed", true);
 
-            // Disegna le linee verso i veri vicini dello spazio a 13D
+            // Draw lines to true neighbors in 13D space
             drawNeighborLines("pca", d);
             drawNeighborLines("mds", d);
 
-            // Mostra Tooltip
+            // Show Tooltip
             const t = d3.select("#tooltip");
             t.style("opacity", 1);
             t.html(`
@@ -163,43 +163,43 @@ function drawScatter(selector, type, scoreProp, containerId) {
             .style("top", event.pageY + "px");
         })
         .on("mouseout", function() {
-            // Ripristina l'opacità dei punti
+            // Restore point opacity
             d3.selectAll("circle").classed("hovered", false).classed("dimmed", false);
             
-            // Nascondi Tooltip
+            // Hide Tooltip
             d3.select("#tooltip").style("opacity", 0);
             
-            // Cancella tutte le linee dei vicini disegnate
+            // Clear all drawn neighbor lines
             d3.selectAll(".links-layer").html("");
         });
 }
 
 // ==========================================
-// 5. DISEGNO DEI COLLEGAMENTI (VICINI REALI)
+// 5. DRAWING LINKS (TRUE NEIGHBORS)
 // ==========================================
 function drawNeighborLines(chartType, sourceData) {
-    // Seleziona il livello delle linee del grafico corretto
+    // Select lines layer of the correct chart
     const layer = d3.select(`#chart-${chartType} .links-layer`);
     
-    // Recupera le scale di quel grafico
+    // Retrieve scales for that chart
     const scaleX = chartScales[chartType].x;
     const scaleY = chartScales[chartType].y;
 
-    // Coordinate del punto su cui abbiamo il mouse
+    // Coordinates of the point hovered
     const sourceX = scaleX(sourceData[`${chartType}_x`]);
     const sourceY = scaleY(sourceData[`${chartType}_y`]);
 
-    // Itera sugli ID dei veri vicini (calcolati dal Python in R^13)
+    // Iterate over true neighbor IDs (calculated by Python in R^13)
     sourceData.neighbors.forEach(targetId => {
-        // Trova i dati del vicino
+        // Find neighbor data
         const targetData = globalData.find(p => p.id === targetId);
         
         if(targetData) {
-            // Calcola la posizione del vicino sul grafico
+            // Calculate neighbor position on chart
             const targetX = scaleX(targetData[`${chartType}_x`]);
             const targetY = scaleY(targetData[`${chartType}_y`]);
 
-            // Disegna la linea
+            // Draw line
             layer.append("line")
                 .attr("class", "link-line")
                 .attr("x1", sourceX)
@@ -210,5 +210,5 @@ function drawNeighborLines(chartType, sourceData) {
     });
 }
 
-// Ridisegna i grafici se la finestra del browser cambia dimensione
+// Redraw charts if browser window resizes
 window.addEventListener('resize', drawCharts);

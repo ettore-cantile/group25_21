@@ -10,7 +10,7 @@ let currentPointSize = 5;
 const brushPCA = d3.brush();
 const brushMDS = d3.brush();
 
-// --- DISCRETE COLOR SCALES OTTIMIZZATE ---
+// --- OPTIMIZED DISCRETE COLOR SCALES ---
 const customTableau = [...d3.schemeTableau10];
 customTableau[2] = '#2ca02c'; 
 const colorOriginal = d3.scaleOrdinal(customTableau);
@@ -24,7 +24,7 @@ const colorRecall = d3.scaleQuantize().domain([0, 1]).range(redsDiscrete);
 const rdYlGnDiscrete = ["#d73027", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"];
 const colorFScore = d3.scaleQuantize().domain([0, 1]).range(rdYlGnDiscrete);
 
-// Tachometri
+// Gauges
 const gauges = {
     precision: { foreground: null },
     recall: { foreground: null },
@@ -50,7 +50,7 @@ Promise.all([
     if(metadata) {
         d3.select("#fb-dataset").text(metadata.dataset || "-");
         
-        // Estrai le statistiche base
+        // Extract base statistics
         if (metadata.global_assessment && metadata.global_assessment.pca && metadata.global_assessment.mds) {
             d3.select("#fb-pca-trust").text((metadata.global_assessment.pca.trustworthiness * 100).toFixed(1) + "%");
             d3.select("#fb-pca-cont").text((metadata.global_assessment.pca.continuity * 100).toFixed(1) + "%");
@@ -58,7 +58,7 @@ Promise.all([
             d3.select("#fb-mds-cont").text((metadata.global_assessment.mds.continuity * 100).toFixed(1) + "%");
         }
 
-        // Estrai il global_f_score e inseriscilo nell'ultimo bottone
+        // Extract global_f_score and insert it into the last button
         let gFScore = metadata.global_f_score;
         if (gFScore === undefined && metadata.global_assessment) {
             gFScore = metadata.global_assessment.global_f_score || metadata.global_assessment.f_score;
@@ -71,17 +71,17 @@ Promise.all([
         }
     }
 
-    // Inizializza i grafici principali
+    // Initialize main charts
     drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
     drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
     setupBrushing();
     
-    // Inizializza i tachimetri (Gauges)
+    // Initialize gauges
     initGauge("#gauge-precision", gauges.precision);
     initGauge("#gauge-recall", gauges.recall);
     initGauge("#gauge-fscore", gauges.fscore);
 
-    // Gestione Switcher Colore e Dimensioni
+    // Color and Size Switcher Management
     enhanceColorModeSwitcher();
 
     d3.selectAll("input[name='colorMode']").on("change", function() {
@@ -104,7 +104,7 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
     const container = d3.select(containerSelector); 
     const width = container.node().clientWidth;
     const height = container.node().clientHeight;
-    // Margini per far respirare gli assi ed evitare tagli
+    // Margins to let axes breathe and avoid clipping
     const margin = { top: 20, right: 25, bottom: 35, left: 35 };
 
     const svgRoot = container.append("svg")
@@ -167,7 +167,7 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
     brushObj.yScale = yScale;
 }
 
-// --- LOGICA DI CLICK (1 Punto) ---
+// --- CLICK LOGIC (Single Point) ---
 function updateSelection(d) {
     d3.select("#pca-plot .brush-group").call(brushPCA.move, null);
     d3.select("#mds-plot .brush-group").call(brushMDS.move, null);
@@ -249,7 +249,7 @@ function handleBrush(event, brushObj, xKey, yKey) {
     updateLiveAnalytics(selectedPoints);
 }
 
-// --- LOGICA AGGIORNAMENTO GAUGES, PLACEHOLDER E PANNELLO DINAMICO ---
+// --- LOGIC TO UPDATE GAUGES, PLACEHOLDER AND DYNAMIC PANEL ---
 function updateLiveAnalytics(selectedPoints) {
     
     if (selectedPoints.length === 0) {
@@ -327,7 +327,7 @@ function updateLegend() {
         uniqueClasses.forEach(cls => {
             const item = gradient.append("div").attr("class", "legend-cluster-item");
             item.append("div").attr("class", "legend-cluster-dot").style("background-color", colorOriginal(cls));
-            item.append("span").text(`Class ${cls}`);
+            item.append("span").text(`Producer ${cls}`);
         });
     } else {
         gradient.style("border", "1px solid #ccc").style("gap", "0");
@@ -344,7 +344,7 @@ function updateLegend() {
     }
 }
 
-// --- 3 TACHOMETRI (GAUGES) RESPONSIVE ---
+// --- 3 RESPONSIVE GAUGES ---
 function initGauge(selector, gaugeObj) {
     const svg = d3.select(selector);
     const width = 100, height = 60;
