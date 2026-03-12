@@ -9,7 +9,6 @@ body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; fon
    ========================================= */
 #app-grid { 
     display: grid; 
-    /* Forza la proporzione 2:1 a prescindere dal contenuto per evitare rotture */
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); 
     grid-template-rows: auto auto minmax(0, 1fr) 50px; 
     grid-template-areas: 
@@ -30,7 +29,19 @@ body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; fon
 h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; }
 .subtitle { margin: 0; font-size: 0.8rem; color: #7f8c8d; }
 
-.top-controls { grid-area: controls; background: #ffffff; padding: 8px 15px; display: flex; flex-direction: row; align-items: center; justify-content: space-between; box-shadow: 0 2px 5px rgba(0,0,0,0.02); z-index: 5; margin-bottom: -5px; }
+.top-controls { 
+    grid-area: controls; 
+    background: #ffffff; 
+    padding: 8px 15px; 
+    display: flex; 
+    flex-direction: row; 
+    align-items: center; 
+    justify-content: space-between; 
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02); 
+    z-index: 5; 
+    margin-bottom: -5px; 
+    height: 55px; /* ALTEZZA FISSA: Impedisce i salti di layout */
+}
 .controls-left { display: flex; flex-direction: row; align-items: center; gap: 15px; }
 .control-label { color: #2c3e50; font-size: 0.9rem; }
 
@@ -40,7 +51,13 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; }
 .segmented-control label { flex: 1; text-align: center; padding: 4px 12px; font-size: 0.85rem; font-weight: 600; color: #495057; border-radius: 4px; cursor: pointer; transition: all 0.2s ease-in-out; white-space: nowrap; }
 .segmented-control input[type="radio"]:checked + label { background-color: #ffffff; color: #2980b9; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
 
-.controls-right { display: flex; flex-direction: column; justify-content: center; min-width: 250px; }
+.controls-right { 
+    display: flex; 
+    flex-direction: column; 
+    justify-content: center; 
+    min-width: 250px; 
+    height: 100%; /* Si adatta perfettamente all'altezza fissa del genitore */
+}
 #legend-gradient { height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; }
 .legend-color-block { flex: 1; height: 100%; }
 .legend-cluster-item { display: flex; flex-direction: row; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: bold; }
@@ -53,7 +70,6 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; }
 #plots-grid {
     grid-area: plots;
     display: grid;
-    /* Forza rigidamente a mantenere sempre il formato 2x2 */
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: repeat(2, minmax(0, 1fr));
     gap: 12px;
