@@ -40,14 +40,28 @@
             </div>
         </section>
 
-        <div class="plot-container" id="panel-pca">
-            <div class="plot-title">PCA Projection</div>
-            <div id="pca-plot" class="svg-container"></div>
-        </div>
-        
-        <div class="plot-container" id="panel-mds">
-            <div class="plot-title">Euclidean MDS Projection</div>
-            <div id="mds-plot" class="svg-container"></div>
+        <div id="plots-grid">
+            <div class="plot-container">
+                <div class="plot-title">PCA Projection</div>
+                <div id="pca-plot" class="svg-container"></div>
+            </div>
+            
+            <div class="plot-container">
+                <div class="plot-title">Euclidean MDS Projection</div>
+                <div id="mds-plot" class="svg-container"></div>
+            </div>
+
+            <div class="plot-container">
+                <div class="plot-title">Placeholder 1</div>
+                <div id="ph1-plot" class="svg-container">
+                    </div>
+            </div>
+
+            <div class="plot-container">
+                <div class="plot-title">Placeholder 2</div>
+                <div id="ph2-plot" class="svg-container">
+                    </div>
+            </div>
         </div>
 
         <div class="plot-container" id="panel-dynamic">
@@ -57,7 +71,7 @@
                 
                 <div id="empty-state-placeholder" class="dynamic-content-wrapper">
                     <div class="placeholder-content">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
                             <line x1="12" y1="8" x2="12" y2="12"></line>
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -107,19 +121,19 @@
                 <div class="fb-value" id="fb-dataset">-</div>
             </div>
             <div class="footer-btn">
-                <div class="fb-label">PCA Trust</div>
+                <div class="fb-label">PCA Trustworthiness</div>
                 <div class="fb-value" id="fb-pca-trust">-</div>
             </div>
             <div class="footer-btn">
-                <div class="fb-label">PCA Cont</div>
+                <div class="fb-label">PCA Continuity</div>
                 <div class="fb-value" id="fb-pca-cont">-</div>
             </div>
             <div class="footer-btn">
-                <div class="fb-label">MDS Trust</div>
+                <div class="fb-label">MDS Trustworthiness</div>
                 <div class="fb-value" id="fb-mds-trust">-</div>
             </div>
             <div class="footer-btn">
-                <div class="fb-label">MDS Cont</div>
+                <div class="fb-label">MDS Continuity</div>
                 <div class="fb-value" id="fb-mds-cont">-</div>
             </div>
             <div class="footer-btn fb-wide">

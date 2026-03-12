@@ -9,13 +9,13 @@ body { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; fon
    ========================================= */
 #app-grid { 
     display: grid; 
-    grid-template-columns: 1fr 1fr 1fr; 
+    grid-template-columns: 2fr 1fr; 
     grid-template-rows: auto auto 1fr 50px; 
     grid-template-areas: 
-        "header header header"
-        "controls controls controls"
-        "pca mds neighbor"
-        "footer footer footer";
+        "header header"
+        "controls controls"
+        "plots analytics"
+        "footer footer";
     height: 100vh; 
     width: 100vw;
     gap: 12px;
@@ -47,39 +47,47 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; }
 .legend-labels { display: flex; justify-content: space-between; font-size: 0.7rem; margin-top: 4px; font-weight: bold; color: #555; }
 
 /* =========================================
-   3 MAIN PANELS
+   GRIGLIA PLOT 2x2 (A Sinistra)
    ========================================= */
-.plot-container { display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden; min-height: 0; }
-#panel-pca { grid-area: pca; margin-left: 12px; }
-#panel-mds { grid-area: mds; }
-#panel-dynamic { grid-area: neighbor; margin-right: 12px; }
+#plots-grid {
+    grid-area: plots;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 12px;
+    margin-left: 12px;
+    min-height: 0; 
+    min-width: 0;
+}
 
+.plot-container { display: flex; flex-direction: column; background: #fff; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); overflow: hidden; min-height: 0; min-width: 0; }
 .plot-title { text-align: center; padding: 8px; font-size: 0.95rem; font-weight: 600; border-bottom: 1px solid #eee; background: #fafafa; flex-shrink: 0; color: #2c3e50; }
-.svg-container { flex: 1; position: relative; width: 100%; height: 100%; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 5px; }
+
+.svg-container { flex: 1; position: relative; width: 100%; height: 100%; min-height: 0; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 0; overflow: hidden; }
 svg { width: 100%; height: 100%; display: block; }
 
 /* =========================================
-   DYNAMIC PANEL (Gauges / Neighbor / Placeholder)
+   DYNAMIC PANEL (A Destra)
    ========================================= */
+#panel-dynamic { grid-area: analytics; margin-right: 12px; }
+
 .dynamic-content-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .hidden-panel { display: none !important; }
 
 /* Placeholder Styling */
-.placeholder-content { text-align: center; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 80%; }
+.placeholder-content { text-align: center; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; max-width: 80%; }
 .placeholder-content p { margin: 0; font-weight: bold; font-size: 1.2rem; color: #2c3e50; }
 .placeholder-content span { font-size: 0.9rem; color: #7f8c8d; line-height: 1.4; }
 
-/* Layout Gauges: ora in riga e più grandi */
+/* Layout Gauges */
 .stat-card { text-align: center; padding: 8px 15px; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee; width: 80%; margin-bottom: 30px; }
 .stat-card h4 { margin: 0 0 2px 0; color: #7f8c8d; font-size: 0.8rem; text-transform: uppercase; }
 .big-number { font-size: 1.8rem; font-weight: bold; margin: 0; color: #2980b9; }
 
-/* Mette i tachimetri in orizzontale */
 .gauges-wrapper { display: flex; flex-direction: row; justify-content: space-around; align-items: flex-end; width: 100%; padding: 0 10px; }
 .gauge-container { display: flex; flex-direction: column; align-items: center; text-align: center; width: 32%; }
 .gauge-container h4 { margin: 0 0 5px 0; color: #2c3e50; font-size: 0.8rem; text-transform: uppercase; }
 .gauge-label { font-size: 1.05rem; font-weight: bold; margin-top: 5px; color: #2980b9; }
-/* Aumentata la dimensione massima */
 .gauge-container svg { height: auto; max-height: 65px; width: 100%; max-width: 120px; }
 
 /* =========================================
@@ -87,7 +95,7 @@ svg { width: 100%; height: 100%; display: block; }
    ========================================= */
 .footer-stats { grid-area: footer; display: flex; gap: 12px; margin: 0 12px; height: 100%; }
 .footer-btn { flex: 1; background-color: #ffffff; border-radius: 6px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); border: 1px solid #e1e8ed; border-top: 3px solid #3498db; }
-.fb-wide { flex: 2; border-top: 3px solid #2ca02c; /* Verde per far risaltare il messaggio globale */ }
+.fb-wide { flex: 2; border-top: 3px solid #2ca02c; }
 .footer-btn .fb-label { font-size: 0.7rem; text-transform: uppercase; color: #7f8c8d; font-weight: 600; margin-bottom: 2px; letter-spacing: 0.5px; }
 .footer-btn .fb-value { font-size: 1.1rem; font-weight: bold; color: #2c3e50; }
 .footer-btn .fb-message { font-size: 0.9rem; font-weight: 500; font-style: italic; color: #27ae60; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; }

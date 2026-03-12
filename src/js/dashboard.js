@@ -92,7 +92,8 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
     const container = d3.select(containerSelector); 
     const width = container.node().clientWidth;
     const height = container.node().clientHeight;
-    const margin = { top: 35, right: 35, bottom: 35, left: 35 };
+    // Margini per far respirare gli assi ed evitare tagli
+    const margin = { top: 20, right: 25, bottom: 35, left: 35 };
 
     const svgRoot = container.append("svg")
         .attr("viewBox", `0 0 ${width} ${height}`)
@@ -105,23 +106,19 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
     svgRoot.on("click", () => {
         d3.selectAll("circle.dot").attr("opacity", 0.9);
         d3.selectAll(".link-group line").remove();
-        updateLiveAnalytics([]); // Forza il reset mostrando il placeholder
+        updateLiveAnalytics([]); 
     });
 
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
-    const plotSize = Math.min(innerWidth, innerHeight);
-    const xOffset = (innerWidth - plotSize) / 2;
-    const yOffset = (innerHeight - plotSize) / 2;
-
     const svg = svgRoot.append("g")
-        .attr("transform", `translate(${margin.left + xOffset},${margin.top + yOffset})`);
+        .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    const xScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[xKey])).nice().range([0, plotSize]);
-    const yScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[yKey])).nice().range([plotSize, 0]);
+    const xScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[xKey])).nice().range([0, innerWidth]);
+    const yScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[yKey])).nice().range([innerHeight, 0]);
 
-    svg.append("g").attr("transform", `translate(0,${plotSize})`).call(d3.axisBottom(xScale).ticks(5));
+    svg.append("g").attr("transform", `translate(0,${innerHeight})`).call(d3.axisBottom(xScale).ticks(5));
     svg.append("g").call(d3.axisLeft(yScale).ticks(5));
 
     svg.append("g").attr("class", "link-group");
@@ -151,7 +148,7 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
             updateSelection(d);
         });
 
-    brushObj.extent([[0, 0], [plotSize, plotSize]]);
+    brushObj.extent([[0, 0], [innerWidth, innerHeight]]);
     brushGroup.call(brushObj);
     
     brushObj.xScale = xScale;
@@ -163,7 +160,6 @@ function updateSelection(d) {
     d3.select("#pca-plot .brush-group").call(brushPCA.move, null);
     d3.select("#mds-plot .brush-group").call(brushMDS.move, null);
 
-    // 1. Mostra solo il contenitore del grafo e nascondi gli altri
     d3.select("#dynamic-panel-title").text("Neighbor Graph");
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
@@ -177,7 +173,6 @@ function updateSelection(d) {
     drawLines("pca", d, neighborIds, "pca_x", "pca_y", brushPCA);
     drawLines("mds", d, neighborIds, "mds_x", "mds_y", brushMDS);
 
-    // 2. Disegna il grafo. 
     const neighborsData = neighborIds.map(id => pointById.get(id)).filter(Boolean);
     drawNeighborGraph(d, neighborsData);
 }
@@ -245,7 +240,6 @@ function handleBrush(event, brushObj, xKey, yKey) {
 // --- LOGICA AGGIORNAMENTO GAUGES, PLACEHOLDER E PANNELLO DINAMICO ---
 function updateLiveAnalytics(selectedPoints) {
     
-    // Se non ci sono punti selezionati -> Mostra il Placeholder
     if (selectedPoints.length === 0) {
         d3.select("#dynamic-panel-title").text("Live Analytics");
         d3.select("#gauges-container").classed("hidden-panel", true);
@@ -254,7 +248,6 @@ function updateLiveAnalytics(selectedPoints) {
         return;
     }
     
-    // Se ci sono punti selezionati -> Mostra i Gauges
     d3.select("#dynamic-panel-title").text("Selection Metrics");
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#neighbor-graph-container").classed("hidden-panel", true);
@@ -272,14 +265,12 @@ function updateLiveAnalytics(selectedPoints) {
 }
 
 // --- HELPERS ---
-
 function resetAllHovers() {
     d3.selectAll("circle.dot").attr("r", currentPointSize).attr("stroke", "rgba(0,0,0,0.4)").attr("stroke-width", 0.8);
     hideTooltip();
 }
 
 // --- UI HELPERS ---
-
 function enhanceColorModeSwitcher() {
     const options = [
         { value: 'original', label: 'Original' },
