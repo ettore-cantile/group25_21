@@ -47,15 +47,27 @@ Promise.all([
     pointById = new Map(dataset.map(p => [p.id, p]));
 
     // 1. Inject Global Data in Footer "Buttons"
-    if(metadata.global_assessment) {
-        d3.select("#fb-dataset").text(metadata.dataset);
-        d3.select("#fb-assessment").text(metadata.global_assessment.message);
+    if(metadata) {
+        d3.select("#fb-dataset").text(metadata.dataset || "-");
         
-        if (metadata.global_assessment.pca && metadata.global_assessment.mds) {
+        // Estrai le statistiche base
+        if (metadata.global_assessment && metadata.global_assessment.pca && metadata.global_assessment.mds) {
             d3.select("#fb-pca-trust").text((metadata.global_assessment.pca.trustworthiness * 100).toFixed(1) + "%");
             d3.select("#fb-pca-cont").text((metadata.global_assessment.pca.continuity * 100).toFixed(1) + "%");
             d3.select("#fb-mds-trust").text((metadata.global_assessment.mds.trustworthiness * 100).toFixed(1) + "%");
             d3.select("#fb-mds-cont").text((metadata.global_assessment.mds.continuity * 100).toFixed(1) + "%");
+        }
+
+        // Estrai il global_f_score e inseriscilo nell'ultimo bottone
+        let gFScore = metadata.global_f_score;
+        if (gFScore === undefined && metadata.global_assessment) {
+            gFScore = metadata.global_assessment.global_f_score || metadata.global_assessment.f_score;
+        }
+        
+        if (gFScore !== undefined) {
+            d3.select("#fb-global-fscore").text((gFScore * 100).toFixed(1) + "%");
+        } else {
+            d3.select("#fb-global-fscore").text("N/A");
         }
     }
 
@@ -97,7 +109,7 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
 
     const svgRoot = container.append("svg")
         .attr("viewBox", `0 0 ${width} ${height}`)
-        .attr("preserveAspectRatio", "xMidYMid meet")
+        .attr("preserveAspectRatio", "none")
         .style("width", "100%")
         .style("height", "100%");
 
