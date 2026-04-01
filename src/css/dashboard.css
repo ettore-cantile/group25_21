@@ -22,11 +22,12 @@ body {
 #app-grid {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr) 50px;
+    grid-template-rows: auto auto minmax(0, 1.3fr) minmax(0, 1fr) 50px;
     grid-template-areas:
         "header header"
         "controls controls"
         "plots analytics"
+        "pc pc"
         "footer footer";
     height: 100vh;
     width: 100vw;
@@ -61,6 +62,7 @@ h1 {
     color: #7f8c8d;
 }
 
+/* RIPRISTINATA ALTEZZA A 55PX */
 .top-controls {
     grid-area: controls;
     background: #ffffff;
@@ -72,7 +74,7 @@ h1 {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
     z-index: 5;
     margin-bottom: -5px;
-    height: 55px; /* FIXED HEIGHT: Prevents layout shifts */
+    height: 55px; 
 }
 
 .controls-left {
@@ -85,6 +87,12 @@ h1 {
 .control-label {
     color: #2c3e50;
     font-size: 0.9rem;
+}
+
+.divider {
+    width: 1px;
+    height: 30px;
+    background-color: #ddd;
 }
 
 /* Segmented Control Switcher */
@@ -119,12 +127,13 @@ h1 {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* RIPRISTINATO IL CONTAINER DI DESTRA AI SUOI 250PX ORIGINALI */
 .controls-right {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-width: 250px;
-    height: 100%; /* Fits perfectly into parent fixed height */
+    min-width: 250px; 
+    height: 100%; 
 }
 
 #legend-gradient {
@@ -166,13 +175,13 @@ h1 {
 }
 
 /* =========================================
-   PLOT GRID 2x2 (Left)
+   PLOT GRID 3x1 (Left)
    ========================================= */
 #plots-grid {
     grid-area: plots;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
     gap: 12px;
     margin-left: 12px;
     height: 100%;
@@ -215,11 +224,32 @@ h1 {
     overflow: hidden;
 }
 
-svg {
-    width: 100%;
-    height: 100%;
-    display: block;
+svg text {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+
+/* Centroid Anomalies Styles */
+.centroid-link { stroke-dasharray: 2; opacity: 0.6; pointer-events: none; }
+.centroid-anomaly { stroke: #c0392b; stroke-width: 2px; opacity: 0.8; z-index: 50; stroke-dasharray: none; }
+.centroid-correct { stroke: #bdc3c7; stroke-width: 0.8px; opacity: 0.3; }
+
+.pc-line { transition: stroke 0.5s ease; }
+.pc-axis path, .pc-axis line { stroke: #34495e; stroke-width: 1.5px; }
+.pc-axis text {
+    paint-order: stroke;
+    stroke: #ffffff;
+    stroke-width: 3px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#pc-panel {
+    grid-area: pc;
+    margin: 0 12px;
+}
+
+/* Filtro Punti */
+.filtered-out { display: none !important; pointer-events: none; }
 
 /* =========================================
    DYNAMIC PANEL (Right)
@@ -332,7 +362,7 @@ svg {
 }
 
 /* =========================================
-   FOOTER (Clean white cards with accent borders)
+   FOOTER 
    ========================================= */
 .footer-stats {
     grid-area: footer;
@@ -391,18 +421,6 @@ svg {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     transition: opacity 0.1s ease;
     border-left: 4px solid #f1c40f;
-}
-
-#tooltip strong {
-    color: #f1c40f;
-}
-
-.tt-diagnosis {
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid #555;
-    font-style: italic;
-    color: #ecf0f1;
 }
 
 .neighbor-link {

@@ -5,12 +5,21 @@ let colorMode = 'original';
 let uniqueClasses = [];
 let pointById = new Map();
 let currentPointSize = 5;
+let selectedPoint = null;
+
+// Filters
+let minPrecision = 0;
+let minRecall = 0;
+
+// Scales Storage per Plot
+const scalesMap = { pca: {}, mds: {}, kmeans: {} };
 
 // D3 Brushes
 const brushPCA = d3.brush();
 const brushMDS = d3.brush();
+const brushKMeans = d3.brush();
 
-// --- OPTIMIZED DISCRETE COLOR SCALES ---
+// --- SCALES ---
 const customTableau = [...d3.schemeTableau10];
 customTableau[2] = '#2ca02c'; 
 const colorOriginal = d3.scaleOrdinal(customTableau);
@@ -24,21 +33,31 @@ const colorRecall = d3.scaleQuantize().domain([0, 1]).range(redsDiscrete);
 const rdYlGnDiscrete = ["#d73027", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"];
 const colorFScore = d3.scaleQuantize().domain([0, 1]).range(rdYlGnDiscrete);
 
+const colorKMeans = d3.scaleOrdinal(d3.schemeCategory10);
+
 // Gauges
-const gauges = {
-    precision: { foreground: null },
-    recall: { foreground: null },
-    fscore: { foreground: null }
-};
+const gauges = { precision: { foreground: null }, recall: { foreground: null }, fscore: { foreground: null } };
 const gaugeAngleScale = d3.scaleLinear().domain([0, 1]).range([-Math.PI / 2, Math.PI / 2]);
 
 // --- INITIALIZATION ---
 Promise.all([
     d3.json("../json/step2_final_data.json?v=" + Date.now()),
-    d3.csv("../../dataset/wine.csv")
-]).then(([data, wineData]) => {
+    d3.csv("../../dataset/wine.csv"),
+    d3.json("../json/kmeans_results.json?v=" + Date.now())
+]).then(([data, wineData, kmeansData]) => {
+    
+    const kmeansMap = new Map();
+    if(kmeansData && kmeansData.points) {
+        kmeansData.points.forEach(p => kmeansMap.set(p.id, p));
+    }
+
     data.points.forEach((p, i) => {
         if (wineData[i]) p.attributes = wineData[i];
+        const kData = kmeansMap.get(p.id);
+        if(kData) {
+            p.kmeans_cluster = kData.kmeans_cluster;
+            p.is_anomaly = kData.is_anomaly; 
+        }
     });
 
     dataset = data.points;
@@ -46,42 +65,34 @@ Promise.all([
     uniqueClasses = Array.from(new Set(dataset.map(d => d.label))).sort();
     pointById = new Map(dataset.map(p => [p.id, p]));
 
-    // 1. Inject Global Data in Footer "Buttons"
+    // Footer Stats
     if(metadata) {
         d3.select("#fb-dataset").text(metadata.dataset || "-");
-        
-        // Extract base statistics
         if (metadata.global_assessment && metadata.global_assessment.pca && metadata.global_assessment.mds) {
             d3.select("#fb-pca-trust").text((metadata.global_assessment.pca.trustworthiness * 100).toFixed(1) + "%");
             d3.select("#fb-pca-cont").text((metadata.global_assessment.pca.continuity * 100).toFixed(1) + "%");
             d3.select("#fb-mds-trust").text((metadata.global_assessment.mds.trustworthiness * 100).toFixed(1) + "%");
             d3.select("#fb-mds-cont").text((metadata.global_assessment.mds.continuity * 100).toFixed(1) + "%");
         }
-
-        // Extract global_f_score and insert it into the last button
         let gFScore = metadata.global_f_score;
-        if (gFScore === undefined && metadata.global_assessment) {
-            gFScore = metadata.global_assessment.global_f_score || metadata.global_assessment.f_score;
-        }
-        
-        if (gFScore !== undefined) {
-            d3.select("#fb-global-fscore").text((gFScore * 100).toFixed(1) + "%");
-        } else {
-            d3.select("#fb-global-fscore").text("N/A");
-        }
+        if (gFScore === undefined && metadata.global_assessment) gFScore = metadata.global_assessment.global_f_score || metadata.global_assessment.f_score;
+        d3.select("#fb-global-fscore").text(gFScore !== undefined ? (gFScore * 100).toFixed(1) + "%" : "N/A");
     }
 
-    // Initialize main charts
     drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
     drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
+    drawPlot("#kmeans-plot", "pca_x", "pca_y", "kmeans", brushKMeans, d => {
+        if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        return getColor(d);
+    });
+    drawParallelCoordinates("#pc-plot");
+    
     setupBrushing();
     
-    // Initialize gauges
     initGauge("#gauge-precision", gauges.precision);
     initGauge("#gauge-recall", gauges.recall);
     initGauge("#gauge-fscore", gauges.fscore);
 
-    // Color and Size Switcher Management
     enhanceColorModeSwitcher();
 
     d3.selectAll("input[name='colorMode']").on("change", function() {
@@ -90,35 +101,54 @@ Promise.all([
         updateLegend();
     });
 
-    d3.select("#point-size-slider").on("input", function() {
+    // Slider Size
+    d3.select("#point-size-slider").on("input change", function() {
         currentPointSize = +this.value;
-        d3.selectAll("circle.dot").attr("r", currentPointSize);
+        d3.selectAll(".dot").attr("r", currentPointSize);
+    });
+
+    // Filters
+    d3.select("#filter-prec").on("input change", function() {
+        minPrecision = +this.value;
+        d3.select("#val-min-prec").text(minPrecision.toFixed(2));
+        applyFilters();
+    });
+
+    d3.select("#filter-rec").on("input change", function() {
+        minRecall = +this.value;
+        d3.select("#val-min-rec").text(minRecall.toFixed(2));
+        applyFilters();
+    });
+
+    d3.select("#show-discrepancies").on("change", function() {
+        toggleDiscrepancies(this.checked);
     });
 
     updateLegend();
-}).catch(err => console.error("Error loading JSON:", err));
+}).catch(err => console.error("Error loading JSON/CSV:", err));
 
 
 // --- PLOTTING FUNCTION ---
-function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
+function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn = null) {
     const container = d3.select(containerSelector); 
     const width = container.node().clientWidth;
     const height = container.node().clientHeight;
-    // Margins to let axes breathe and avoid clipping
     const margin = { top: 20, right: 25, bottom: 35, left: 35 };
 
     const svgRoot = container.append("svg")
         .attr("viewBox", `0 0 ${width} ${height}`)
-        .attr("preserveAspectRatio", "none")
         .style("width", "100%")
         .style("height", "100%");
 
     svgRoot.on("mouseleave", resetAllHovers);
 
     svgRoot.on("click", () => {
-        d3.selectAll("circle.dot").attr("opacity", 0.9);
+        selectedPoint = null;
+        d3.selectAll(".dot, .pc-line").style("opacity", 0.9);
         d3.selectAll(".link-group line").remove();
+        resetAllHovers();
         updateLiveAnalytics([]); 
+        if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
     });
 
     const innerWidth = width - margin.left - margin.right;
@@ -130,28 +160,35 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
     const xScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[xKey])).nice().range([0, innerWidth]);
     const yScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[yKey])).nice().range([innerHeight, 0]);
 
+    scalesMap[plotId] = { xScale, yScale, xKey, yKey };
+
     svg.append("g").attr("transform", `translate(0,${innerHeight})`).call(d3.axisBottom(xScale).ticks(5));
     svg.append("g").call(d3.axisLeft(yScale).ticks(5));
 
+    svg.append("g").attr("class", "centroid-layer");
     svg.append("g").attr("class", "link-group");
     const brushGroup = svg.append("g").attr("class", "brush-group");
 
     svg.selectAll(".dot")
         .data(dataset)
         .enter().append("circle")
-        .attr("class", `dot dot-${plotId}`)
-        .attr("id", d => `dot-${d.id}`)
+        .attr("class", d => `dot dot-${plotId} pt-${d.id}`)
         .attr("cx", d => xScale(d[xKey]))
         .attr("cy", d => yScale(d[yKey]))
         .attr("r", currentPointSize)
-        .attr("fill", d => getColor(d))
+        .attr("fill", d => customColorFn ? customColorFn(d) : getColor(d))
         .attr("stroke", "rgba(0,0,0,0.4)")
         .attr("stroke-width", 0.8)
-        .attr("opacity", 0.9)
+        .style("opacity", 0.9)
         .style("cursor", "pointer")
         .on("mouseover", function(event, d) {
             resetAllHovers();
-            d3.selectAll(`#dot-${d.id}`).attr("r", currentPointSize * 1.6).attr("stroke", "rgba(0,0,0,0.9)").attr("stroke-width", 2).raise();
+            d3.selectAll(`.dot.pt-${d.id}`)
+              .attr("r", currentPointSize * 1.6)
+              .attr("stroke", "rgba(0,0,0,0.9)")
+              .attr("stroke-width", 2).raise();
+            d3.selectAll(`.pc-line.pt-${d.id}`)
+              .style("stroke-width", 3).raise();
             showTooltip(event, d);
         })
         .on("mouseout", function() { resetAllHovers(); })
@@ -167,23 +204,171 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj) {
     brushObj.yScale = yScale;
 }
 
+// --- FILTERS LOGIC ---
+function applyFilters() {
+    d3.selectAll(".dot, .pc-line")
+        .classed("filtered-out", d => d.precision < minPrecision || d.recall < minRecall)
+        .style("display", d => (d.precision < minPrecision || d.recall < minRecall) ? "none" : null)
+        .style("pointer-events", d => (d.precision < minPrecision || d.recall < minRecall) ? "none" : "auto");
+        
+    if(d3.select("#show-discrepancies").property("checked")) {
+        toggleDiscrepancies(true);
+    }
+}
+
+// --- VISUALIZING ANOMALIES VIA CENTROIDS ---
+function toggleDiscrepancies(show) {
+    if (show) {
+        ['pca', 'mds', 'kmeans'].forEach(plotId => {
+            const scales = scalesMap[plotId];
+            const svg = d3.select(`#${plotId}-plot svg g .centroid-layer`);
+            svg.selectAll("*").remove(); 
+
+            const validKMeansClusters = Array.from(new Set(dataset.map(d => d.kmeans_cluster).filter(c => c !== undefined)));
+            const centroids = {};
+            validKMeansClusters.forEach(k => centroids[k] = {x:0, y:0, count:0});
+
+            dataset.forEach(d => {
+                if(d.precision >= minPrecision && d.recall >= minRecall && d.kmeans_cluster !== undefined) {
+                    centroids[d.kmeans_cluster].x += scales.xScale(d[scales.xKey]);
+                    centroids[d.kmeans_cluster].y += scales.yScale(d[scales.yKey]);
+                    centroids[d.kmeans_cluster].count += 1;
+                }
+            });
+
+            validKMeansClusters.forEach(k => {
+                if(centroids[k].count > 0) {
+                    centroids[k].x /= centroids[k].count;
+                    centroids[k].y /= centroids[k].count;
+                }
+            });
+
+            dataset.forEach(d => {
+                if(d.precision < minPrecision || d.recall < minRecall || d.kmeans_cluster === undefined) return; 
+                if(centroids[d.kmeans_cluster].count === 0) return;
+                
+                const cx = centroids[d.kmeans_cluster].x;
+                const cy = centroids[d.kmeans_cluster].y;
+                const px = scales.xScale(d[scales.xKey]);
+                const py = scales.yScale(d[scales.yKey]);
+                
+                svg.append("line")
+                    .attr("x1", px).attr("y1", py)
+                    .attr("x2", cx).attr("y2", cy)
+                    .attr("class", d.is_anomaly ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct");
+            });
+
+            validKMeansClusters.forEach(k => {
+                if(centroids[k].count === 0) return;
+                svg.append("path")
+                    .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
+                    .attr("transform", `translate(${centroids[k].x}, ${centroids[k].y})`)
+                    .attr("fill", colorKMeans(k))
+                    .attr("stroke", "black")
+                    .attr("stroke-width", 1.5)
+                    .append("title").text(`K-Means Centroid ${k}`);
+            });
+        });
+
+        d3.selectAll(".dot:not(.filtered-out)")
+            .style("opacity", d => d.is_anomaly ? 1.0 : 0.2)
+            .attr("stroke-width", d => d.is_anomaly ? 1.5 : 0);
+
+        d3.selectAll(".pc-line:not(.filtered-out)")
+            .style("opacity", d => d.is_anomaly ? 1.0 : 0.1)
+            .style("stroke-width", d => d.is_anomaly ? 2.5 : 1);
+
+        updateConfusionMatrix(dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall));
+    } else {
+        ['pca', 'mds', 'kmeans'].forEach(plotId => d3.select(`#${plotId}-plot svg g .centroid-layer`).selectAll("*").remove());
+        d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9).attr("stroke-width", 0.8);
+        d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
+        d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+        d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+    }
+}
+
+function updateConfusionMatrix(activePoints) {
+    d3.select("#dynamic-panel-title").text("Cluster Discrepancies");
+    d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+    d3.select("#gauges-container").classed("hidden-panel", true);
+    d3.select("#neighbor-graph-container").classed("hidden-panel", true);
+    d3.select("#confusion-matrix-container").classed("hidden-panel", false);
+
+    const classes = Array.from(new Set(dataset.map(d => String(d.label)))).sort();
+    const matrix = {};
+    classes.forEach(r => {
+        matrix[r] = {};
+        classes.forEach(c => matrix[r][c] = 0);
+    });
+    
+    activePoints.forEach(p => {
+        const trueL = String(p.label); 
+        const predL = String(p.kmeans_cluster); 
+        if (matrix[trueL] && matrix[trueL][predL] !== undefined) {
+            matrix[trueL][predL]++;
+        }
+    });
+
+    let html = "<table style='border-collapse: collapse; width: 100%; text-align: center; font-size: 0.85rem;'>";
+    html += "<thead><tr><th style='border-bottom: 1px solid #ccc; font-weight:normal; text-align:left; padding-bottom:5px;'>Abstract ↓ \\ KMeans →</th>";
+    
+    classes.forEach(c => { html += `<th>Matched C${c}</th>`; });
+    html += "</tr></thead><tbody>";
+    
+    classes.forEach(row => {
+        html += `<tr><td style='font-weight:bold; border-right: 1px solid #eee; text-align:left; padding: 8px 0;'>Producer ${row}</td>`;
+        classes.forEach(col => {
+            const count = matrix[row][col];
+            const isDiag = (row === col); 
+            const style = isDiag 
+                ? "background: #e6fffa; color: #2ca02c; font-weight: bold;" 
+                : (count > 0 ? "background: #fff5f5; color: #c0392b; font-weight: bold;" : "color: #bdc3c7;");
+            html += `<td style='padding: 8px; border-bottom: 1px solid #eee; ${style}'>${count}</td>`;
+        });
+        html += "</tr>";
+    });
+    html += "</tbody></table>";
+    d3.select("#cm-table").html(html);
+}
+
+
 // --- CLICK LOGIC (Single Point) ---
 function updateSelection(d) {
+    selectedPoint = d;
+
     d3.select("#pca-plot .brush-group").call(brushPCA.move, null);
     d3.select("#mds-plot .brush-group").call(brushMDS.move, null);
+    d3.select("#kmeans-plot .brush-group").call(brushKMeans.move, null);
 
     d3.select("#dynamic-panel-title").text("Neighbor Graph");
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
+    d3.select("#confusion-matrix-container").classed("hidden-panel", true);
     d3.select("#neighbor-graph-container").classed("hidden-panel", false);
 
     const neighborIds = d.neighbors || [];
     const activeIds = new Set([d.id, ...neighborIds]);
 
-    d3.selectAll("circle.dot").attr("opacity", p => activeIds.has(p.id) ? 0.9 : 0.15);
+    // Livello 1, 2 e 3 per scatterplot e parallel coordinates
+    d3.selectAll(".dot:not(.filtered-out)")
+        .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.8 : 0.1))
+        .attr("r", p => p.id === d.id ? currentPointSize * 1.5 : currentPointSize)
+        .attr("stroke-width", p => p.id === d.id ? 2 : 0.8);
+
+    d3.selectAll(".pc-line:not(.filtered-out)")
+        .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.6 : 0.05))
+        .style("stroke-width", p => p.id === d.id ? 3 : 1.5);
+
+    // Sollevamento SVG: prima i vicini, poi la selezione principale per assicurarsi che stia al top
+    d3.selectAll(".pc-line:not(.filtered-out)").filter(p => activeIds.has(p.id) && p.id !== d.id).raise();
+    d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
+    d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id) && p.id !== d.id).raise();
+    d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === d.id).raise();
 
     drawLines("pca", d, neighborIds, "pca_x", "pca_y", brushPCA);
     drawLines("mds", d, neighborIds, "mds_x", "mds_y", brushMDS);
+    drawLines("kmeans", d, neighborIds, "pca_x", "pca_y", brushKMeans); 
 
     const neighborsData = neighborIds.map(id => pointById.get(id)).filter(Boolean);
     drawNeighborGraph(d, neighborsData);
@@ -193,18 +378,18 @@ function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
     const linkGroup = d3.select(`#${plotId}-plot .link-group`);
     linkGroup.selectAll("line").remove(); 
 
-    const sourceX = scales.xScale(sourceD[xKey]);
-    const sourceY = scales.yScale(sourceD[yKey]);
+    const sourceX = scalesMap[plotId].xScale(sourceD[xKey]);
+    const sourceY = scalesMap[plotId].yScale(sourceD[yKey]);
 
-    const linesData = neighborIds.map(id => pointById.get(id)).filter(Boolean);
+    const linesData = neighborIds.map(id => pointById.get(id)).filter(p => p && p.precision >= minPrecision && p.recall >= minRecall);
 
     linkGroup.selectAll("line")
         .data(linesData)
         .enter().append("line")
         .attr("x1", sourceX)
         .attr("y1", sourceY)
-        .attr("x2", target => scales.xScale(target[xKey]))
-        .attr("y2", target => scales.yScale(target[yKey]))
+        .attr("x2", target => scalesMap[plotId].xScale(target[xKey]))
+        .attr("y2", target => scalesMap[plotId].yScale(target[yKey]))
         .attr("stroke", target => target.label === sourceD.label ? "#2ca02c" : "#e74c3c")
         .attr("stroke-width", 1.5)
         .attr("opacity", 0.6);
@@ -212,14 +397,17 @@ function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
 
 // --- BI-DIRECTIONAL BRUSHING ---
 function setupBrushing() {
-    brushPCA.on("start brush end", function(event) {
-        if(event.sourceEvent && event.sourceEvent.type === "mousedown") d3.select("#mds-plot .brush-group").call(brushMDS.move, null);
-        handleBrush(event, brushPCA, "pca_x", "pca_y");
-    });
-
-    brushMDS.on("start brush end", function(event) {
-        if(event.sourceEvent && event.sourceEvent.type === "mousedown") d3.select("#pca-plot .brush-group").call(brushPCA.move, null);
-        handleBrush(event, brushMDS, "mds_x", "mds_y");
+    [brushPCA, brushMDS, brushKMeans].forEach(brush => {
+        brush.on("start brush end", function(event) {
+            if(event.sourceEvent && event.sourceEvent.type === "mousedown") {
+                [brushPCA, brushMDS, brushKMeans].filter(b => b !== brush).forEach(b => {
+                    const selector = b === brushPCA ? "#pca-plot" : b === brushMDS ? "#mds-plot" : "#kmeans-plot";
+                    d3.select(`${selector} .brush-group`).call(b.move, null);
+                });
+            }
+            const plotId = brush === brushPCA ? "pca" : brush === brushMDS ? "mds" : "kmeans";
+            handleBrush(event, brush, scalesMap[plotId].xKey, scalesMap[plotId].yKey);
+        });
     });
 }
 
@@ -229,40 +417,51 @@ function handleBrush(event, brushObj, xKey, yKey) {
 
     if (!event.selection) {
         if (event.type === "end") {
-            d3.selectAll("circle.dot").attr("opacity", 0.9); 
+            selectedPoint = null;
+            d3.selectAll(".dot:not(.filtered-out), .pc-line:not(.filtered-out)").style("opacity", 0.9); 
             resetAllHovers(); 
             updateLiveAnalytics([]); 
         }
         return;
     }
 
+    selectedPoint = null;
     const [[x0, y0], [x1, y1]] = event.selection;
     let selectedPoints = [];
     dataset.forEach(d => {
+        if(d.precision < minPrecision || d.recall < minRecall) return;
         const cx = brushObj.xScale(d[xKey]);
         const cy = brushObj.yScale(d[yKey]);
         const isSelected = x0 <= cx && cx <= x1 && y0 <= cy && cy <= y1;
         if (isSelected) selectedPoints.push(d);
-        d3.selectAll(`#dot-${d.id}`).attr("opacity", isSelected ? 0.9 : 0.15);
+        d3.selectAll(`.pt-${d.id}:not(.filtered-out)`).style("opacity", isSelected ? 0.9 : 0.15);
     });
     
     updateLiveAnalytics(selectedPoints);
 }
 
-// --- LOGIC TO UPDATE GAUGES, PLACEHOLDER AND DYNAMIC PANEL ---
+// --- LOGIC TO UPDATE GAUGES AND DYNAMIC PANEL ---
 function updateLiveAnalytics(selectedPoints) {
     
     if (selectedPoints.length === 0) {
         d3.select("#dynamic-panel-title").text("Live Analytics");
         d3.select("#gauges-container").classed("hidden-panel", true);
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
-        d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+        
+        if (d3.select("#show-discrepancies").property("checked")) {
+            d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+            d3.select("#confusion-matrix-container").classed("hidden-panel", false);
+        } else {
+            d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+            d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+        }
         return;
     }
     
     d3.select("#dynamic-panel-title").text("Selection Metrics");
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#neighbor-graph-container").classed("hidden-panel", true);
+    d3.select("#confusion-matrix-container").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", false);
 
     d3.select("#stat-count").text(selectedPoints.length);
@@ -278,11 +477,24 @@ function updateLiveAnalytics(selectedPoints) {
 
 // --- HELPERS ---
 function resetAllHovers() {
-    d3.selectAll("circle.dot").attr("r", currentPointSize).attr("stroke", "rgba(0,0,0,0.4)").attr("stroke-width", 0.8);
+    if (selectedPoint) {
+        d3.selectAll(".dot")
+            .attr("r", p => p.id === selectedPoint.id ? currentPointSize * 1.5 : currentPointSize)
+            .attr("stroke", p => p.id === selectedPoint.id ? "rgba(0,0,0,0.9)" : "rgba(0,0,0,0.4)")
+            .attr("stroke-width", p => p.id === selectedPoint.id ? 2 : 0.8);
+        d3.selectAll(".pc-line")
+            .style("stroke-width", p => p.id === selectedPoint.id ? 3 : 1.5);
+    } else {
+        d3.selectAll(".dot")
+            .attr("r", currentPointSize)
+            .attr("stroke", "rgba(0,0,0,0.4)")
+            .attr("stroke-width", 0.8);
+        d3.selectAll(".pc-line")
+            .style("stroke-width", 1.5);
+    }
     hideTooltip();
 }
 
-// --- UI HELPERS ---
 function enhanceColorModeSwitcher() {
     const options = [
         { value: 'original', label: 'Original' },
@@ -303,7 +515,6 @@ function enhanceColorModeSwitcher() {
     });
 }
 
-// --- COLOR SCALES & LEGEND ---
 function getColor(d) {
     if (colorMode === 'original') return colorOriginal(d.label);
     if (colorMode === 'precision') return colorPrecision(d.precision);
@@ -312,9 +523,19 @@ function getColor(d) {
 }
 
 function updateColors() {
-    d3.selectAll("circle.dot").transition().duration(500).attr("fill", d => getColor(d));
+    d3.selectAll(".dot.dot-pca").transition().duration(500).attr("fill", d => getColor(d));
+    d3.selectAll(".dot.dot-mds").transition().duration(500).attr("fill", d => getColor(d));
+    d3.selectAll(".dot.dot-kmeans").transition().duration(500).attr("fill", d => {
+        if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        return getColor(d);
+    });
+    d3.selectAll(".pc-line").transition().duration(500).style("stroke", d => {
+        if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        return getColor(d);
+    });
 }
 
+// --- LEGENDA (CORREZIONE ALLINEAMENTO) ---
 function updateLegend() {
     const gradient = d3.select("#legend-gradient");
     const labelsDiv = d3.select("#legend-labels");
@@ -323,13 +544,25 @@ function updateLegend() {
     labelsDiv.selectAll("*").remove();
 
     if (colorMode === 'original') {
-        gradient.style("border", "none").style("background", "transparent").style("justify-content", "flex-end").style("gap", "15px");
+        // Nascondiamo completamente il contenitore delle label per evitare che il margin spinga su i pallini
+        labelsDiv.style("display", "none"); 
+        
+        gradient.style("border", "none").style("background", "transparent").style("justify-content", "flex-end").style("gap", "8px");
+        
         uniqueClasses.forEach(cls => {
             const item = gradient.append("div").attr("class", "legend-cluster-item");
             item.append("div").attr("class", "legend-cluster-dot").style("background-color", colorOriginal(cls));
-            item.append("span").text(`Producer ${cls}`);
+            item.append("span").text(`Prod ${cls}`);
         });
+        
+        const anomalyItem = gradient.append("div").attr("class", "legend-cluster-item");
+        anomalyItem.append("div").attr("class", "legend-cluster-dot").style("background-color", "#e74c3c");
+        anomalyItem.append("span").text(`Anomaly`);
+        
     } else {
+        // Mostriamo il div dei numeri
+        labelsDiv.style("display", "flex"); 
+        
         gradient.style("border", "1px solid #ccc").style("gap", "0");
         let colors = [];
         let minT = "", maxT = "";
@@ -344,7 +577,7 @@ function updateLegend() {
     }
 }
 
-// --- 3 RESPONSIVE GAUGES ---
+// --- GAUGES ---
 function initGauge(selector, gaugeObj) {
     const svg = d3.select(selector);
     const width = 100, height = 60;
@@ -378,24 +611,28 @@ function updateGauge(gaugeObj, value, color, textSelector) {
         .attr("fill", color);
 }
 
-// --- TOOLTIPS ---
+// --- TOOLTIPS ESATTI ---
 function showTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
     
     let fpText = d.precision < 0.9 
-        ? `🔴 <strong>False Positive:</strong> Attracts <strong>${((1 - d.precision)*100).toFixed(1)}%</strong> of points from other classes.` 
-        : `🟢 <strong>Low FPs:</strong> No class mixing.`;
+        ? `🔴 <span style="color: #f1c40f; font-style: italic; font-weight: bold;">False Positive:</span> Attracts <span style="color: white; font-weight: bold;">${((1 - d.precision)*100).toFixed(1)}%</span> of points from other classes.` 
+        : `🟢 <span style="color: #f1c40f; font-style: italic; font-weight: bold;">Low FPs:</span> No class mixing.`;
         
     let fnText = d.recall < 0.9 
-        ? `🔴 <strong>False Negative:</strong> Disconnected from <strong>${((1 - d.recall)*100).toFixed(1)}%</strong> of points in its own class.` 
-        : `🟢 <strong>Low FNs:</strong> Highly cohesive.`;
+        ? `🔴 <span style="color: #f1c40f; font-style: italic; font-weight: bold;">False Negative:</span> Disconnected from <span style="color: white; font-weight: bold;">${((1 - d.recall)*100).toFixed(1)}%</span> of points in its own class.` 
+        : `🟢 <span style="color: #f1c40f; font-style: italic; font-weight: bold;">Low FNs:</span> Highly cohesive.`;
+
+    let anomalyText = d.is_anomaly ? `<span style='color: #e74c3c;'>⚠️ <strong>Anomaly:</strong> True P${d.label} assigned to KMeans C${d.kmeans_cluster}</span><br>` : "";
 
     tooltip.html(`
-        <strong>ID:</strong> ${d.id} | <strong>Class:</strong> ${d.label}<br>
-        <strong>Precision:</strong> ${(d.precision*100).toFixed(1)}%<br>
-        <strong>Recall:</strong> ${(d.recall*100).toFixed(1)}%<br>
-        <strong>F-Score:</strong> ${(d.f_score*100).toFixed(1)}%
-        <div class="tt-diagnosis">
+        <strong style="color: #f1c40f;">ID:</strong> ${d.id} | <strong style="color: #f1c40f;">Class:</strong> ${d.label}<br>
+        <strong style="color: #f1c40f;">Precision:</strong> ${d.precision === 1 ? "100" : (d.precision*100).toFixed(1)}%<br>
+        <strong style="color: #f1c40f;">Recall:</strong> ${d.recall === 1 ? "100" : (d.recall*100).toFixed(1)}%<br>
+        <strong style="color: #f1c40f;">F-Score:</strong> ${d.f_score === 1 ? "100" : (d.f_score*100).toFixed(1)}%
+        <hr style="border: 0; border-top: 1px solid #555; margin: 8px 0 6px 0;">
+        <div style="color: #ecf0f1; line-height: 1.4;">
+            ${anomalyText}
             ${fpText}<br>
             ${fnText}
         </div>
@@ -423,8 +660,10 @@ function showAttributeTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
     if (!d.attributes) return showTooltip(event, d); 
 
+    const formatKey = (key) => key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+
     const attributesHtml = Object.entries(d.attributes)
-        .map(([key, value]) => `<strong>${key.replace(/_/g, ' ')}:</strong> ${value}`).join('<br>');
+        .map(([key, value]) => `<strong><span style="color: #f1c40f;">${formatKey(key)}:</span></strong> <span style="color: white;">${value}</span>`).join('<br>');
 
     tooltip.html(attributesHtml);
 
@@ -441,7 +680,7 @@ function showAttributeTooltip(event, d) {
     tooltip.style("left", x + "px").style("top", y + "px").transition().duration(100).style("opacity", 1);
 }
 
-// --- NEIGHBOR GRAPH (FORCE-DIRECTED) ---
+// --- NEIGHBOR GRAPH ---
 function drawNeighborGraph(centerNode, neighborNodes) {
     const svg = d3.select("#neighbor-graph-svg");
     svg.selectAll("*").remove();
@@ -484,13 +723,18 @@ function drawNeighborGraph(centerNode, neighborNodes) {
         .data(graphNodes)
         .join("g")
         .attr("class", d => d.id === centerNode.id ? "neighbor-node center" : "neighbor-node")
-        .on("mouseover", showAttributeTooltip) 
-        .on("mouseout", hideTooltip)
         .call(drag(simulation, centerNode, size));
 
     node.append("circle")
         .attr("r", d => d.id === centerNode.id ? 20 : 15)
-        .attr("fill", d => colorOriginal(d.label));
+        .attr("fill", d => colorOriginal(d.label))
+        .style("cursor", "pointer")
+        .on("mouseover", function(event, d) {
+            showAttributeTooltip(event, d);
+        })
+        .on("mouseout", function() {
+            hideTooltip();
+        });
 
     simulation.on("tick", () => {
         link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
@@ -517,4 +761,110 @@ function drag(simulation, centerNode, size) {
         }
     }
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
+}
+
+// --- PARALLEL COORDINATES ---
+function drawParallelCoordinates(containerSelector) {
+    const container = d3.select(containerSelector); 
+    if (container.empty()) return;
+    
+    container.html("");
+
+    const width = container.node().clientWidth;
+    const height = container.node().clientHeight;
+    const margin = { top: 30, right: 30, bottom: 20, left: 30 };
+    
+    const innerWidth = width - margin.left - margin.right;
+    const innerHeight = height - margin.top - margin.bottom;
+
+    const svgRoot = container.append("svg")
+        .attr("viewBox", `0 0 ${width} ${height}`)
+        .style("width", "100%")
+        .style("height", "100%");
+
+    svgRoot.on("mouseleave", resetAllHovers);
+    svgRoot.on("click", () => {
+        selectedPoint = null;
+        d3.selectAll(".dot, .pc-line").style("opacity", 0.9);
+        d3.selectAll(".link-group line").remove();
+        resetAllHovers();
+        updateLiveAnalytics([]); 
+        if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
+    });
+
+    const svg = svgRoot.append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    if (!dataset || dataset.length === 0 || !dataset[0].attributes) return;
+
+    const features = Object.keys(dataset[0].attributes);
+
+    const x = d3.scalePoint()
+        .range([0, innerWidth])
+        .padding(0.1)
+        .domain(features);
+
+    const y = {};
+    features.forEach(f => {
+        y[f] = d3.scaleLinear()
+            .domain(d3.extent(dataset, d => +d.attributes[f]))
+            .range([innerHeight, 0])
+            .nice();
+    });
+
+    function path(d) {
+        return d3.line()(features.map(f => [x(f), y[f](d.attributes[f])]));
+    }
+
+    const linesGroup = svg.append("g").attr("class", "pc-lines-group");
+    const axesGroup = svg.append("g").attr("class", "pc-axes-group");
+
+    linesGroup.selectAll(".pc-line")
+        .data(dataset)
+        .enter().append("path")
+        .attr("class", d => `pc-line pt-${d.id}`)
+        .attr("d", path)
+        .style("fill", "none")
+        .style("stroke", d => {
+            if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
+        })
+        .style("stroke-width", 1.5)
+        .style("opacity", 0.6)
+        .on("mouseover", function(event, d) {
+            resetAllHovers();
+            d3.selectAll(`.dot.pt-${d.id}`)
+              .attr("r", currentPointSize * 1.6)
+              .attr("stroke", "rgba(0,0,0,0.9)")
+              .attr("stroke-width", 2).raise();
+            d3.selectAll(`.pc-line.pt-${d.id}`)
+              .style("stroke-width", 3).raise();
+            showAttributeTooltip(event, d);
+        })
+        .on("mouseout", function() { resetAllHovers(); })
+        .on("click", function(event, d) {
+            event.stopPropagation();
+            updateSelection(d);
+        });
+
+    const axes = axesGroup.selectAll(".pc-axis")
+        .data(features).enter()
+        .append("g")
+        .attr("class", "pc-axis")
+        .attr("transform", f => `translate(${x(f)},0)`);
+
+    axes.each(function(f) {
+        d3.select(this).call(d3.axisLeft(y[f]).ticks(5));
+    });
+
+    axes.append("text")
+        .style("text-anchor", "middle")
+        .attr("y", -15)
+        .text(f => {
+            let name = f.replace(/_/g, ' ');
+            return name.charAt(0).toUpperCase() + name.slice(1);
+        })
+        .style("fill", "#2c3e50")
+        .style("font-size", "0.65rem")
+        .style("font-weight", "bold");
 }
