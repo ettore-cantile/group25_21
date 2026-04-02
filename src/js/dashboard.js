@@ -421,7 +421,7 @@ function applyFilters() {
     }
 }
 
-// --- ANOMALY VISUALIZATION (CENTROIDS) ---
+// --- VISUALIZING ANOMALIES VIA CENTROIDS ---
 // Draws physical lines connecting points to their assigned K-Means cluster centroid
 function toggleDiscrepancies(show) {
     const plotMapping = { pca: '#pca-plot', mds: '#mds-plot', kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
@@ -430,16 +430,16 @@ function toggleDiscrepancies(show) {
     if (show) {
         Object.keys(plotMapping).forEach(plotId => {
             const scales = scalesMap[plotId];
-            const svg = d3.select(`${plotMapping[plotId]} svg g .centroid-layer`);
-            svg.selectAll("*").remove(); 
+            const svgContainer = d3.select(`${plotMapping[plotId]} svg g .centroid-layer`);
+            if (svgContainer.empty()) return;
+            svgContainer.selectAll("*").remove(); 
 
-            // Determine which K-Means data applies based on the current plot
             const isPCA2D = plotId === 'pca2d';
             const isMDS2D = plotId === 'mds2d';
+            // Determine cluster property based on plot context
             const clusterProp = isPCA2D ? 'pca_kmeans_cluster' : (isMDS2D ? 'mds_kmeans_cluster' : 'kmeans_cluster');
             const anomalyProp = isPCA2D ? 'pca_is_anomaly' : (isMDS2D ? 'mds_is_anomaly' : 'is_anomaly');
 
-            // Calculate Centroid Coordinates dynamically based on current filtered points
             const validKMeansClusters = Array.from(new Set(dataset.map(d => d[clusterProp]).filter(c => c !== undefined)));
             const centroids = {};
             validKMeansClusters.forEach(k => centroids[k] = {x:0, y:0, count:0});
@@ -459,68 +459,53 @@ function toggleDiscrepancies(show) {
                 }
             });
 
-            // Draw connecting lines
             dataset.forEach(d => {
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
                 
-                const cx = centroids[d[clusterProp]].x;
-                const cy = centroids[d[clusterProp]].y;
-                const px = scales.xScale(d[scales.xKey]);
-                const py = scales.yScale(d[scales.yKey]);
-                
-                svg.append("line")
-                    .attr("x1", px).attr("y1", py)
-                    .attr("x2", cx).attr("y2", cy)
+                svgContainer.append("line")
+                    .attr("x1", scales.xScale(d[scales.xKey])).attr("y1", scales.yScale(d[scales.yKey]))
+                    .attr("x2", centroids[d[clusterProp]].x).attr("y2", centroids[d[clusterProp]].y)
                     .attr("class", d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct");
             });
 
-            // Draw Centroid Cross symbols
             validKMeansClusters.forEach(k => {
                 if(centroids[k].count === 0) return;
-                svg.append("path")
+                svgContainer.append("path")
                     .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
                     .attr("transform", `translate(${centroids[k].x}, ${centroids[k].y})`)
                     .attr("fill", colorKMeans(k))
                     .attr("stroke", "black")
-                    .attr("stroke-width", 1.5)
-                    .append("title").text(`K-Means Centroid ${k}`);
+                    .attr("stroke-width", 1.5);
             });
         });
 
-        // Fade correct points, emphasize anomalies
+        // Highlights anomalies by fading normal points
         d3.selectAll(".dot.dot-pca:not(.filtered-out), .dot.dot-mds:not(.filtered-out), .dot.dot-kmeans:not(.filtered-out)")
-            .style("opacity", d => d.is_anomaly ? 1.0 : 0.2).attr("stroke-width", d => d.is_anomaly ? 1.5 : 0);
+            .style("opacity", d => d.is_anomaly ? 1.0 : 0.2);
         d3.selectAll(".dot.dot-pca2d:not(.filtered-out)")
-            .style("opacity", d => d.pca_is_anomaly ? 1.0 : 0.2).attr("stroke-width", d => d.pca_is_anomaly ? 1.5 : 0);
+            .style("opacity", d => d.pca_is_anomaly ? 1.0 : 0.2);
         d3.selectAll(".dot.dot-mds2d:not(.filtered-out)")
-            .style("opacity", d => d.mds_is_anomaly ? 1.0 : 0.2).attr("stroke-width", d => d.mds_is_anomaly ? 1.5 : 0);
+            .style("opacity", d => d.mds_is_anomaly ? 1.0 : 0.2);
 
-        d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("opacity", d => d.is_anomaly ? 1.0 : 0.1)
-            .style("stroke-width", d => d.is_anomaly ? 2.5 : 1);
-
-        // Update confusion matrix panel
-        let activePoints;
-        if (currentTab === '13d') {
-            activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
-            updateConfusionMatrix(activePoints);
+        // Logic for Dynamic Panel output
+        let activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
+        
+        // Show confusion matrices only if a single point isn't already selected for the radar
+        if (!selectedPoint) {
+            updateConfusionMatrix(activePoints, currentTab);
         }
         
     } else {
-        // Clear Discrepancy Graphics
         Object.values(plotMapping).forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
-        d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9).attr("stroke-width", 0.8);
-        d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
-        
-        if (currentTab === '13d') {
-            d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-        }
+        d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
+        d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+        if (!selectedPoint && brushedPointsGlobal.length === 0) d3.select("#empty-state-placeholder").classed("hidden-panel", false);
     }
 }
 
-// Builds HTML tables mapping Original Producer to K-Means assigned cluster
-function updateConfusionMatrix(activePoints) {
+// Generates Confusion Matrices for Abstract vs Data-Dependent labels
+function updateConfusionMatrix(activePoints, tabMode) {
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
     d3.select("#neighbor-graph-container").classed("hidden-panel", true);
@@ -529,50 +514,51 @@ function updateConfusionMatrix(activePoints) {
     d3.select("#confusion-matrix-container").classed("hidden-panel", false);
 
     const classes = Array.from(new Set(dataset.map(d => String(d.label)))).sort();
-    
     d3.select("#dynamic-panel-title").text("Cluster Discrepancies");
-    d3.select("#cm-main-title").style("display", "block");
-    d3.select("#cm-desc").style("display", "block");
-    
-    // Initialize empty mapping matrix
-    const matrix = {};
-    classes.forEach(r => {
-        matrix[r] = {};
-        classes.forEach(c => matrix[r][c] = 0);
-    });
-    
-    // Populate matrix counts
-    activePoints.forEach(p => {
-        const trueL = String(p.label); 
-        const predL = String(p.kmeans_cluster); 
-        if (matrix[trueL] && matrix[trueL][predL] !== undefined) {
-            matrix[trueL][predL]++;
-        }
-    });
 
-    // Generate HTML Table
-    let html = "<table style='border-collapse: collapse; width: 100%; text-align: center; font-size: 0.85rem;'>";
-    html += "<thead><tr><th style='border-bottom: 1px solid #ccc; font-weight:normal; text-align:left; padding-bottom:5px;'>Abstract ↓ \\ KMeans →</th>";
-    
-    classes.forEach(c => { html += `<th>Matched C${c}</th>`; });
-    html += "</tr></thead><tbody>";
-    
-    classes.forEach(row => {
-        html += `<tr><td style='font-weight:bold; border-right: 1px solid #eee; text-align:left; padding: 8px 0;'>Producer ${row}</td>`;
-        classes.forEach(col => {
-            const count = matrix[row][col];
-            const isDiag = (row === col); 
-            const style = isDiag 
-                ? "background: #e6fffa; color: #2ca02c; font-weight: bold;" 
-                : (count > 0 ? "background: #fff5f5; color: #c0392b; font-weight: bold;" : "color: #bdc3c7;");
-            html += `<td style='padding: 8px; border-bottom: 1px solid #eee; ${style}'>${count}</td>`;
+    // Clear current tables
+    d3.select("#cm-table").html("");
+
+    const generateTableHtml = (clusterKey, title) => {
+        const matrix = {};
+        classes.forEach(r => { matrix[r] = {}; classes.forEach(c => matrix[r][c] = 0); });
+        
+        activePoints.forEach(p => {
+            const trueL = String(p.label); 
+            const predL = String(p[clusterKey]); 
+            if (matrix[trueL] && matrix[trueL][predL] !== undefined) matrix[trueL][predL]++;
         });
-        html += "</tr>";
-    });
-    html += "</tbody></table>";
-    d3.select("#cm-table").html(html);
-}
 
+        let html = `<h5 style='margin: 15px 0 5px 0; color: #34495e; border-bottom: 1px solid #eee;'>${title}</h5>`;
+        html += "<table style='border-collapse: collapse; width: 100%; text-align: center; font-size: 0.75rem; margin-bottom: 10px;'>";
+        html += "<thead><tr><th style='border-bottom: 1px solid #ccc;'>Producer ↓ \\ KMeans →</th>";
+        classes.forEach(c => { html += `<th>C${c}</th>`; });
+        html += "</tr></thead><tbody>";
+        
+        classes.forEach(row => {
+            html += `<tr><td style='font-weight:bold; border-right: 1px solid #eee;'>P${row}</td>`;
+            classes.forEach(col => {
+                const count = matrix[row][col];
+                const isDiag = (row === col); 
+                const style = isDiag ? "background: #e6fffa; color: #2ca02c;" : (count > 0 ? "background: #fff5f5; color: #c0392b;" : "color: #bdc3c7;");
+                html += `<td style='padding: 4px; border-bottom: 1px solid #eee; ${style}'>${count}</td>`;
+            });
+            html += "</tr>";
+        });
+        return html + "</tbody></table>";
+    };
+
+    let fullHtml = "";
+    if (tabMode === '13d') {
+        fullHtml = generateTableHtml('kmeans_cluster', 'Global 13D K-Means');
+    } else {
+        // Double table for Tab 2
+        fullHtml = generateTableHtml('pca_kmeans_cluster', 'PCA 2D K-Means');
+        fullHtml += generateTableHtml('mds_kmeans_cluster', 'MDS 2D K-Means');
+    }
+    
+    d3.select("#cm-table").html(fullHtml);
+}
 
 // --- SINGLE POINT CLICK LOGIC ---
 // Handles isolation, visual linking, and specific dynamic panel views
