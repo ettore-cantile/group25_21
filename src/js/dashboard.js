@@ -1,298 +1,294 @@
 // --- GLOBAL STATE ---
-// Store the main dataset and its metadata
 let dataset = [];
 let metadata = {};
-// Current color mapping mode (Original, Precision, Recall, F-Score)
 let colorMode = 'original';
-// Unique labels (Producers)
 let uniqueClasses = [];
-// Map for quick point lookups by ID
 let pointById = new Map();
-// Default visual size for scatterplot dots
 let currentPointSize = 5;
-// Currently clicked point for detailed analysis
 let selectedPoint = null;
-// Array holding points selected via brushing
 let brushedPointsGlobal = []; 
-// Which K-Means projection source is currently active in the 13D tab
 let kmeansProjectionSource = 'pca'; 
+let currentDatasetName = "wine";
 
-// --- FILTERS ---
-// Thresholds for precision and recall filtering
+// Filters
 let minPrecision = 0;
 let minRecall = 0;
 
-// --- SCALES STORAGE ---
-// Store D3 scales for each plot to allow coordinate conversions later
+// Scales Storage
 const scalesMap = { pca: {}, mds: {}, kmeans: {}, pca2d: {}, mds2d: {} };
 
-// --- D3 BRUSHES ---
-// Initialize brushing behaviors for all plots
-const brushPCA = d3.brush();
-const brushMDS = d3.brush();
-const brushKMeans = d3.brush();
-const brushPCA2D = d3.brush();
-const brushMDS2D = d3.brush();
+// D3 Brushes
+let brushPCA, brushMDS, brushKMeans, brushPCA2D, brushMDS2D;
 
-// --- RADAR CHART DATA ---
-// Dynamically populated array of chemical features (dimensions) to be plotted
+// Radar Chart Data
 let radarDimensions = [];
-// Store min/max values for each dimension for normalization
 let radarMinMax = {};
-// Store average feature values for Ground Truth (Producer) clusters
 let origClusterAvg = {};
-// Store average feature values for Data-Dependent (K-Means) clusters
 let kmeansClusterAvg = {};
 
-// --- COLOR SCALES ---
-// Custom color palette for original labels (Producer)
+// Color Scales
 const customTableau = [...d3.schemeTableau10];
 customTableau[2] = '#2ca02c'; 
 const colorOriginal = d3.scaleOrdinal(customTableau);
-
-// Quantitative scales for quality metrics
 const bluesDiscrete = ["#08519c", "#3182bd", "#6baed6", "#9ecae1", "#c6dbef"];
 const colorPrecision = d3.scaleQuantize().domain([0, 1]).range(bluesDiscrete); 
-
 const redsDiscrete = ["#a50f15", "#de2d26", "#fb6a4a", "#fc9272", "#fcbba1"];
 const colorRecall = d3.scaleQuantize().domain([0, 1]).range(redsDiscrete);
-
 const rdYlGnDiscrete = ["#d73027", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"];
 const colorFScore = d3.scaleQuantize().domain([0, 1]).range(rdYlGnDiscrete);
-
-// Standard categorical color scale for K-Means clusters
 const colorKMeans = d3.scaleOrdinal(d3.schemeCategory10);
 
-// --- GAUGES STATE ---
-// References for the gauge arcs to allow animated transitions
+// Gauges
 const gauges = { precision: { foreground: null }, recall: { foreground: null }, fscore: { foreground: null } };
 const gaugeAngleScale = d3.scaleLinear().domain([0, 1]).range([-Math.PI / 2, Math.PI / 2]);
 
-// --- INITIALIZATION ---
-// Load all JSON and CSV resources concurrently
-Promise.all([
-    d3.json("../json/step2_final_data.json?v=" + Date.now()),
-    d3.csv("../../dataset/wine.csv"),
-    d3.json("../json/kmeans_results.json?v=" + Date.now()),
-    d3.json("../json/kmeans_2d_results.json?v=" + Date.now())
-]).then(([data, wineData, kmeansData, kmeans2dData]) => {
+
+// --- DYNAMIC DASHBOARD INITIALIZATION ---
+function initDashboard(folder) {
+    // 1. SAFELY CLEAR ONLY PLOTS
+    // Do NOT clear universal classes like .svg-container or it will destroy Live Analytics!
+    const targetPlotsToClear = [
+        "#pca-plot", "#mds-plot", "#kmeans-plot", 
+        "#pca-plot-2d", "#mds-plot-2d", 
+        "#pc-plot", "#comparison-plot", 
+        "#radar-chart-svg-container", "#neighbor-graph-svg"
+    ];
+    targetPlotsToClear.forEach(selector => d3.select(selector).html(""));
+    d3.select("#cm-table").html("");
     
-    // Map K-Means 13D results by ID
-    const kmeansMap = new Map();
-    if(kmeansData && kmeansData.points) {
-        kmeansData.points.forEach(p => kmeansMap.set(p.id, p));
-    }
+    // 2. RESET LOCAL STATES & BRUSHES
+    selectedPoint = null;
+    brushedPointsGlobal = [];
+    pointById.clear();
+    
+    brushPCA = d3.brush();
+    brushMDS = d3.brush();
+    brushKMeans = d3.brush();
+    brushPCA2D = d3.brush();
+    brushMDS2D = d3.brush();
 
-    // Map K-Means 2D results by ID
-    const kmeans2dMap = new Map();
-    if(kmeans2dData && kmeans2dData.points) {
-        kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
-    }
+    // 3. RESET UI PANELS IMMEDIATELY TO AVOID OLD GHOST DATA
+    d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+    d3.select("#gauges-container").classed("hidden-panel", true);
+    d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+    d3.select("#radar-empty-state").classed("hidden-panel", true);
+    d3.select("#radar-chart-container").classed("hidden-panel", true);
+    d3.select("#neighbor-graph-container").classed("hidden-panel", true);
+    d3.select("#dynamic-panel-title").text("Live Analytics");
 
-    // Dynamically extract chemical attributes from the CSV headers
-    if (wineData && wineData.length > 0) {
-        const allKeys = Object.keys(wineData[0]);
-        // Filter out common label/class column names so only chemical features remain
-        radarDimensions = allKeys.filter(k => !['producer', 'label', 'class'].includes(k.toLowerCase()));
-    }
+    const basePath = `../json/${folder}/`;
 
-    // Merge datasets: Projections + Raw Attributes + K-Means 13D + K-Means 2D
-    data.points.forEach((p, i) => {
-        if (wineData[i]) p.attributes = wineData[i];
+    // 4. FETCH ALL REQUIRED FILES
+    Promise.all([
+        d3.json(`${basePath}step2_final_data.json?v=${Date.now()}`),
+        d3.csv(`../../dataset/${folder}.csv`),
+        d3.json(`${basePath}kmeans_results.json?v=${Date.now()}`),
+        d3.json(`${basePath}kmeans_2d_results.json?v=${Date.now()}`)
+    ]).then(([data, csvData, kmeansData, kmeans2dData]) => {
         
-        const kData = kmeansMap.get(p.id);
-        if(kData) {
-            p.kmeans_cluster = kData.kmeans_cluster;
-            p.is_anomaly = kData.is_anomaly; 
+        // Extract Attribute Names Dynamically 
+        // Exclude specific columns including 'variety'
+        if (csvData && csvData.length > 0) {
+            const allKeys = Object.keys(csvData[0]);
+            radarDimensions = allKeys.filter(k => !['producer', 'label', 'class', 'species', 'variety', 'unnamed', 'uns'].some(sub => k.toLowerCase().includes(sub)));
         }
+
+        const kmeansMap = new Map();
+        if(kmeansData?.points) kmeansData.points.forEach(p => kmeansMap.set(p.id, p));
+
+        const kmeans2dMap = new Map();
+        if(kmeans2dData?.points) kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
+
+        // Assign to dataset
+        data.points.forEach((p, i) => {
+            if (csvData[i]) p.attributes = csvData[i];
+            
+            const kData = kmeansMap.get(p.id);
+            if(kData) {
+                p.kmeans_cluster = kData.kmeans_cluster;
+                p.is_anomaly = kData.is_anomaly; 
+            }
+            
+            const k2dData = kmeans2dMap.get(p.id);
+            if(k2dData) {
+                p.pca_kmeans_cluster = k2dData.pca_kmeans_cluster;
+                p.pca_is_anomaly = k2dData.pca_is_anomaly;
+                p.mds_kmeans_cluster = k2dData.mds_kmeans_cluster;
+                p.mds_is_anomaly = k2dData.mds_is_anomaly;
+            }
+        });
+
+        dataset = data.points;
+        metadata = data.metadata;
+        uniqueClasses = Array.from(new Set(dataset.map(d => String(d.label)))).sort();
+        pointById = new Map(dataset.map(p => [p.id, p]));
+
+        // Reset domain mapping so colors always start cleanly from the beginning
+        colorOriginal.domain(uniqueClasses);
+        colorKMeans.domain(uniqueClasses);
+
+        // Precompute Radar Stats
+        radarMinMax = {};
+        origClusterAvg = {};
+        kmeansClusterAvg = {};
+
+        radarDimensions.forEach(dim => {
+            radarMinMax[dim] = {
+                min: d3.min(dataset, d => +d.attributes[dim]),
+                max: d3.max(dataset, d => +d.attributes[dim])
+            };
+        });
+
+        uniqueClasses.forEach(c => {
+            let pts = dataset.filter(d => String(d.label) === c);
+            origClusterAvg[c] = {};
+            radarDimensions.forEach(dim => {
+                origClusterAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]);
+            });
+        });
+
+        const pcaKmeansClasses = Array.from(new Set(dataset.map(d => String(d.pca_kmeans_cluster)).filter(c => c !== "undefined")));
+        pcaKmeansClasses.forEach(c => {
+            let pts = dataset.filter(d => String(d.pca_kmeans_cluster) === c);
+            kmeansClusterAvg[c] = {};
+            radarDimensions.forEach(dim => {
+                kmeansClusterAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]);
+            });
+        });
+
+        // Update Footer Details
+        if(metadata) {
+            if (metadata.global_assessment && metadata.global_assessment.pca && metadata.global_assessment.mds) {
+                d3.select("#fb-pca-trust").text((metadata.global_assessment.pca.trustworthiness * 100).toFixed(1) + "%");
+                d3.select("#fb-pca-cont").text((metadata.global_assessment.pca.continuity * 100).toFixed(1) + "%");
+                d3.select("#fb-mds-trust").text((metadata.global_assessment.mds.trustworthiness * 100).toFixed(1) + "%");
+                d3.select("#fb-mds-cont").text((metadata.global_assessment.mds.continuity * 100).toFixed(1) + "%");
+            }
+            let gFScore = metadata.global_f_score || (metadata.global_assessment ? metadata.global_assessment.global_f_score : 0);
+            d3.select("#fb-global-fscore").text(gFScore !== undefined ? (gFScore * 100).toFixed(1) + "%" : "N/A");
+        }
+
+        // Draw Scatters
+        drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
+        drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
+        drawPlot("#kmeans-plot", kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x', kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y', "kmeans", brushKMeans, d => {
+            if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
+        });
         
-        const k2dData = kmeans2dMap.get(p.id);
-        if(k2dData) {
-            p.pca_kmeans_cluster = k2dData.pca_kmeans_cluster;
-            p.pca_is_anomaly = k2dData.pca_is_anomaly;
-            p.mds_kmeans_cluster = k2dData.mds_kmeans_cluster;
-            p.mds_is_anomaly = k2dData.mds_is_anomaly;
-        }
-    });
-
-    dataset = data.points;
-    metadata = data.metadata;
-    uniqueClasses = Array.from(new Set(dataset.map(d => d.label))).sort();
-    pointById = new Map(dataset.map(p => [p.id, p]));
-
-    // Precompute Min and Max for each chemical feature for Radar Chart normalization
-    radarDimensions.forEach(dim => {
-        radarMinMax[dim] = {
-            min: d3.min(dataset, d => +d.attributes[dim]),
-            max: d3.max(dataset, d => +d.attributes[dim])
-        };
-    });
-
-    // Precompute feature averages for Ground Truth (Producer) clusters
-    uniqueClasses.forEach(c => {
-        let pts = dataset.filter(d => d.label === c);
-        origClusterAvg[c] = {};
-        radarDimensions.forEach(dim => {
-            origClusterAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]);
+        d3.select("#app-grid").classed("mode-2d", true);
+        d3.selectAll(".tab-2d").classed("hidden-panel", false);
+        d3.selectAll(".tab-13d").classed("hidden-panel", true);
+        
+        drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D, d => {
+            if (colorMode === 'original') return d.pca_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
         });
-    });
-
-    // Precompute feature averages for Data-Dependent (K-Means 2D PCA) clusters
-    const pcaKmeansClasses = Array.from(new Set(dataset.map(d => d.pca_kmeans_cluster).filter(c => c !== undefined)));
-    pcaKmeansClasses.forEach(c => {
-        let pts = dataset.filter(d => d.pca_kmeans_cluster === c);
-        kmeansClusterAvg[c] = {};
-        radarDimensions.forEach(dim => {
-            kmeansClusterAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]);
+        drawPlot("#mds-plot-2d", "mds_x", "mds_y", "mds2d", brushMDS2D, d => {
+            if (colorMode === 'original') return d.mds_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
         });
-    });
 
-    // Populate Global Footer Statistics
-    if(metadata) {
-        d3.select("#fb-dataset").text(metadata.dataset || "-");
-        if (metadata.global_assessment && metadata.global_assessment.pca && metadata.global_assessment.mds) {
-            d3.select("#fb-pca-trust").text((metadata.global_assessment.pca.trustworthiness * 100).toFixed(1) + "%");
-            d3.select("#fb-pca-cont").text((metadata.global_assessment.pca.continuity * 100).toFixed(1) + "%");
-            d3.select("#fb-mds-trust").text((metadata.global_assessment.mds.trustworthiness * 100).toFixed(1) + "%");
-            d3.select("#fb-mds-cont").text((metadata.global_assessment.mds.continuity * 100).toFixed(1) + "%");
+        const grid2d = d3.select("#plots-grid-2d");
+        if (grid2d.select("#comparison-plot-container").empty()) {
+            const newPlot = grid2d.append("div").attr("id", "comparison-plot-container").attr("class", "plot-container").style("grid-column", "1 / span 2");
+            newPlot.append("div").attr("class", "plot-title").text("Cluster Agreement Flow"); 
+            newPlot.append("div").attr("id", "comparison-plot").attr("class", "svg-container"); 
         }
-        let gFScore = metadata.global_f_score;
-        if (gFScore === undefined && metadata.global_assessment) gFScore = metadata.global_assessment.global_f_score || metadata.global_assessment.f_score;
-        d3.select("#fb-global-fscore").text(gFScore !== undefined ? (gFScore * 100).toFixed(1) + "%" : "N/A");
-    }
 
-    // Initialize 13D Projection Scatterplots
-    drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
-    drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
-    drawPlot("#kmeans-plot", kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x', kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y', "kmeans", brushKMeans, d => {
-        if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
-        return getColor(d);
+        const is13D = d3.select("input[name='mainTab']:checked").node().value === '13d';
+        d3.select("#app-grid").classed("mode-2d", !is13D);
+        d3.selectAll(".tab-2d").classed("hidden-panel", is13D);
+        d3.selectAll(".tab-13d").classed("hidden-panel", !is13D);
+
+        // Draw Complex Components
+        drawParallelCoordinates("#pc-plot");
+        drawSankeyDiagram("#comparison-plot", dataset);
+        
+        // Re-attach UI Logic
+        setupBrushing();
+        updateLegend();
+        updateLiveAnalytics([]); // Render logic for empty state
+        
+        if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
+
+    }).catch(err => {
+        console.error(`Error loading dataset [${folder}]:`, err);
+        alert(`Failed to load data for dataset: ${folder}. \n\nEnsure that the CSV file is named '${folder}.csv' and that you have run the Python scripts to generate JSON files in '../json/${folder}/'`);
     });
-    
-    // Prepare and Initialize 2D Projection Scatterplots
-    d3.select("#app-grid").classed("mode-2d", true);
-    d3.selectAll(".tab-2d").classed("hidden-panel", false);
-    d3.selectAll(".tab-13d").classed("hidden-panel", true);
-    drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D, d => {
-        if (colorMode === 'original') return d.pca_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
-        return getColor(d);
-    });
-    drawPlot("#mds-plot-2d", "mds_x", "mds_y", "mds2d", brushMDS2D, d => {
-        if (colorMode === 'original') return d.mds_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
-        return getColor(d);
-    });
+}
 
-    // Setup Layout for Sankey Diagram Comparison (2D Tab)
-    const grid2d = d3.select("#plots-grid-2d");
-    const pcaPlotContainer = d3.select("#pca-plot-2d").node()?.closest('.plot-container');
-    const mdsPlotContainer = d3.select("#mds-plot-2d").node()?.closest('.plot-container');
-
-    grid2d.selectAll(".plot-container").filter(function() {
-        const isComparisonPlot = d3.select(this).attr("id") === "comparison-plot-container";
-        return this !== pcaPlotContainer && this !== mdsPlotContainer && !isComparisonPlot;
-    }).remove();
-
-    if (grid2d.select("#comparison-plot-container").empty()) {
-        const newPlot = grid2d.append("div")
-            .attr("id", "comparison-plot-container")
-            .attr("class", "plot-container")
-            .style("grid-column", "1 / span 2");
-
-        newPlot.append("div")
-            .attr("class", "plot-title")
-            .text("Cluster Agreement Flow"); 
-        newPlot.append("div").attr("id", "comparison-plot").attr("class", "svg-container"); 
-    }
-
-    // Restore UI state to the default 13D view
-    d3.select("#app-grid").classed("mode-2d", false);
-    d3.selectAll(".tab-2d").classed("hidden-panel", true);
-    d3.selectAll(".tab-13d").classed("hidden-panel", false);
-
-    // Initialize Multidimensional Visualizations
-    drawParallelCoordinates("#pc-plot");
-    drawSankeyDiagram("#comparison-plot", dataset);
-    
-    // Bind Interactive Elements
-    setupBrushing();
+// Initial Boot
+document.addEventListener("DOMContentLoaded", () => {
+    initDashboard(currentDatasetName);
     initGauge("#gauge-precision", gauges.precision);
     initGauge("#gauge-recall", gauges.recall);
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
+});
 
-    // Setup UI Event Listeners
-    d3.selectAll("input[name='colorMode']").on("change", function() {
-        colorMode = this.value;
-        updateColors();
-        updateLegend();
-    });
+// --- GLOBAL EVENT LISTENERS ---
+d3.select("#dataset-selector").on("change", function() {
+    currentDatasetName = this.value;
+    initDashboard(currentDatasetName);
+});
 
-    d3.select("#point-size-slider").on("input change", function() {
-        currentPointSize = +this.value;
-        d3.selectAll(".dot").attr("r", currentPointSize);
-    });
+d3.select("#point-size-slider").on("input change", function() {
+    currentPointSize = +this.value;
+    d3.selectAll(".dot").attr("r", currentPointSize);
+});
 
-    d3.select("#filter-prec").on("input change", function() {
-        minPrecision = +this.value;
-        d3.select("#val-min-prec").text(minPrecision.toFixed(2));
-        applyFilters();
-    });
+d3.select("#filter-prec").on("input change", function() {
+    minPrecision = +this.value;
+    d3.select("#val-min-prec").text(minPrecision.toFixed(2));
+    applyFilters();
+});
 
-    d3.select("#filter-rec").on("input change", function() {
-        minRecall = +this.value;
-        d3.select("#val-min-rec").text(minRecall.toFixed(2));
-        applyFilters();
-    });
+d3.select("#filter-rec").on("input change", function() {
+    minRecall = +this.value;
+    d3.select("#val-min-rec").text(minRecall.toFixed(2));
+    applyFilters();
+});
 
-    d3.select("#show-discrepancies").on("change", function() {
-        toggleDiscrepancies(this.checked);
-    });
+d3.select("#show-discrepancies").on("change", function() {
+    toggleDiscrepancies(this.checked);
+});
 
-    d3.selectAll("input[name='kmeansSource']").on("change", function() {
-        kmeansProjectionSource = this.value;
-        redrawKMeansPlot();
-    });
+d3.selectAll("input[name='kmeansSource']").on("change", function() {
+    kmeansProjectionSource = this.value;
+    redrawKMeansPlot();
+});
 
-    // --- TAB SWITCHER LOGIC ---
-    // Handle transitions between 13D Analysis and 2D Analysis tabs
-    d3.selectAll("input[name='mainTab']").on("change", function() {
-        const selectedTab = this.value;
+d3.selectAll("input[name='mainTab']").on("change", function() {
+    const selectedTab = this.value;
+    
+    if (selectedTab === '13d') {
+        d3.select("#app-grid").classed("mode-2d", false);
+        d3.selectAll(".tab-13d").classed("hidden-panel", false);
+        d3.selectAll(".tab-2d").classed("hidden-panel", true);
+    } else {
+        d3.select("#app-grid").classed("mode-2d", true);
+        d3.selectAll(".tab-13d").classed("hidden-panel", true);
+        d3.selectAll(".tab-2d").classed("hidden-panel", false);
         
-        if (selectedTab === '13d') {
-            d3.select("#app-grid").classed("mode-2d", false);
-            d3.selectAll(".tab-13d").classed("hidden-panel", false);
-            d3.selectAll(".tab-2d").classed("hidden-panel", true);
-        } else {
-            d3.select("#app-grid").classed("mode-2d", true);
-            d3.selectAll(".tab-13d").classed("hidden-panel", true);
-            d3.selectAll(".tab-2d").classed("hidden-panel", false);
-            
-            // Re-render Sankey based on current brush selection
-            const activeData = brushedPointsGlobal.length > 1 
-                ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall)
-                : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
-            drawSankeyDiagram("#comparison-plot", activeData);
-        }
+        const activeData = brushedPointsGlobal.length > 1 
+            ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall)
+            : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
+        drawSankeyDiagram("#comparison-plot", activeData);
+    }
 
-        // Restore dynamic panel view based on current selection
-        if (selectedPoint) {
-            updateSelection(selectedPoint);
-        } else if (brushedPointsGlobal.length > 0) {
-            updateLiveAnalytics(brushedPointsGlobal);
-        } else {
-            updateLiveAnalytics([]);
-        }
-        
-        // Ensure discrepancy lines stay visible if toggled on
-        if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
-    });
+    if (selectedPoint) {
+        updateSelection(selectedPoint);
+    } else if (brushedPointsGlobal.length > 0) {
+        updateLiveAnalytics(brushedPointsGlobal);
+    } else {
+        updateLiveAnalytics([]);
+    }
+    
+    if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
+});
 
-    updateLegend();
-}).catch(err => console.error("Error loading JSON/CSV:", err));
-
-
-// --- KMEANS PLOT REDRAW ---
-// Re-renders the K-Means scatterplot if the user switches the data source
+// --- PLOTTING LOGIC ---
 function redrawKMeansPlot() {
     const xKey = kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x';
     const yKey = kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y';
@@ -305,18 +301,10 @@ function redrawKMeansPlot() {
     });
 
     applyFilters();
-    if (d3.select("#show-discrepancies").property("checked")) {
-        toggleDiscrepancies(true);
-    }
-
-    if (selectedPoint) {
-        updateSelection(selectedPoint);
-    }
+    if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
+    if (selectedPoint) updateSelection(selectedPoint);
 }
 
-
-// --- 2D SCATTERPLOTS FUNCTION ---
-// Generic function to generate a 2D scatterplot mapped to specific dataset keys
 function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn = null) {
     const container = d3.select(containerSelector); 
     const width = container.node().clientWidth;
@@ -329,8 +317,6 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         .style("height", "100%");
 
     svgRoot.on("mouseleave", resetAllHovers);
-
-    // Clicking the background clears all selections
     svgRoot.on("click", () => {
         selectedPoint = null;
         brushedPointsGlobal = [];
@@ -350,7 +336,6 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
     const xScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[xKey])).nice().range([0, innerWidth]);
     const yScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[yKey])).nice().range([innerHeight, 0]);
 
-    // Store scales to allow visual linking between plots later
     scalesMap[plotId] = { xScale, yScale, xKey, yKey };
 
     svg.append("g").attr("transform", `translate(0,${innerHeight})`).call(d3.axisBottom(xScale).ticks(5));
@@ -360,7 +345,6 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
     svg.append("g").attr("class", "link-group");
     const brushGroup = svg.append("g").attr("class", "brush-group");
 
-    // Draw the points
     svg.selectAll(".dot")
         .data(dataset)
         .enter().append("circle")
@@ -375,7 +359,6 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         .style("cursor", "pointer")
         .on("mouseover", function(event, d) {
             resetAllHovers();
-            // Highlight across all plots
             d3.selectAll(`.dot.pt-${d.id}`)
               .attr("r", currentPointSize * 1.6)
               .attr("stroke", "rgba(0,0,0,0.9)")
@@ -390,28 +373,21 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
             updateSelection(d);
         });
 
-    // Initialize Brush
     brushObj.extent([[0, 0], [innerWidth, innerHeight]]);
     brushGroup.call(brushObj);
-    
-    // Attach scales to brush object for coordinate recovery
     brushObj.xScale = xScale;
     brushObj.yScale = yScale;
 }
 
-// --- FILTERS LOGIC ---
-// Visually hide points that do not meet precision/recall thresholds
+// --- FILTERS & ANOMALIES ---
 function applyFilters() {
     d3.selectAll(".dot, .pc-line")
         .classed("filtered-out", d => d.precision < minPrecision || d.recall < minRecall)
         .style("display", d => (d.precision < minPrecision || d.recall < minRecall) ? "none" : null)
         .style("pointer-events", d => (d.precision < minPrecision || d.recall < minRecall) ? "none" : "auto");
         
-    if(d3.select("#show-discrepancies").property("checked")) {
-        toggleDiscrepancies(true);
-    }
+    if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
     
-    // Auto-update Sankey if 2D tab is active
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     if (currentTab === '2d') {
          const activeData = brushedPointsGlobal.length > 1 
@@ -421,8 +397,6 @@ function applyFilters() {
     }
 }
 
-// --- VISUALIZING ANOMALIES VIA CENTROIDS ---
-// Draws physical lines connecting points to their assigned K-Means cluster centroid
 function toggleDiscrepancies(show) {
     const plotMapping = { pca: '#pca-plot', mds: '#mds-plot', kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
@@ -436,7 +410,6 @@ function toggleDiscrepancies(show) {
 
             const isPCA2D = plotId === 'pca2d';
             const isMDS2D = plotId === 'mds2d';
-            // Determine cluster property based on plot context
             const clusterProp = isPCA2D ? 'pca_kmeans_cluster' : (isMDS2D ? 'mds_kmeans_cluster' : 'kmeans_cluster');
             const anomalyProp = isPCA2D ? 'pca_is_anomaly' : (isMDS2D ? 'mds_is_anomaly' : 'is_anomaly');
 
@@ -480,31 +453,29 @@ function toggleDiscrepancies(show) {
             });
         });
 
-        // Highlights anomalies by fading normal points
         d3.selectAll(".dot.dot-pca:not(.filtered-out), .dot.dot-mds:not(.filtered-out), .dot.dot-kmeans:not(.filtered-out)")
             .style("opacity", d => d.is_anomaly ? 1.0 : 0.2);
         d3.selectAll(".dot.dot-pca2d:not(.filtered-out)")
             .style("opacity", d => d.pca_is_anomaly ? 1.0 : 0.2);
         d3.selectAll(".dot.dot-mds2d:not(.filtered-out)")
             .style("opacity", d => d.mds_is_anomaly ? 1.0 : 0.2);
+        d3.selectAll(".pc-line:not(.filtered-out)")
+            .style("opacity", d => d.is_anomaly ? 1.0 : 0.1)
+            .style("stroke-width", d => d.is_anomaly ? 2.5 : 1);
 
-        // Logic for Dynamic Panel output
         let activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
         
-        // Show confusion matrices only if a single point isn't already selected for the radar
-        if (!selectedPoint) {
-            updateConfusionMatrix(activePoints, currentTab);
-        }
+        if (!selectedPoint) updateConfusionMatrix(activePoints, currentTab);
         
     } else {
         Object.values(plotMapping).forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
+        d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
         if (!selectedPoint && brushedPointsGlobal.length === 0) d3.select("#empty-state-placeholder").classed("hidden-panel", false);
     }
 }
 
-// Generates Confusion Matrices for Abstract vs Data-Dependent labels
 function updateConfusionMatrix(activePoints, tabMode) {
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
@@ -515,8 +486,6 @@ function updateConfusionMatrix(activePoints, tabMode) {
 
     const classes = Array.from(new Set(dataset.map(d => String(d.label)))).sort();
     d3.select("#dynamic-panel-title").text("Cluster Discrepancies");
-
-    // Clear current tables
     d3.select("#cm-table").html("");
 
     const generateTableHtml = (clusterKey, title) => {
@@ -531,12 +500,12 @@ function updateConfusionMatrix(activePoints, tabMode) {
 
         let html = `<h5 style='margin: 15px 0 5px 0; color: #34495e; border-bottom: 1px solid #eee;'>${title}</h5>`;
         html += "<table style='border-collapse: collapse; width: 100%; text-align: center; font-size: 0.75rem; margin-bottom: 10px;'>";
-        html += "<thead><tr><th style='border-bottom: 1px solid #ccc;'>Producer ↓ \\ KMeans →</th>";
+        html += "<thead><tr><th style='border-bottom: 1px solid #ccc;'>GT ↓ \\ KMeans →</th>";
         classes.forEach(c => { html += `<th>C${c}</th>`; });
         html += "</tr></thead><tbody>";
         
         classes.forEach(row => {
-            html += `<tr><td style='font-weight:bold; border-right: 1px solid #eee;'>P${row}</td>`;
+            html += `<tr><td style='font-weight:bold; border-right: 1px solid #eee;'>Class ${row}</td>`;
             classes.forEach(col => {
                 const count = matrix[row][col];
                 const isDiag = (row === col); 
@@ -550,9 +519,8 @@ function updateConfusionMatrix(activePoints, tabMode) {
 
     let fullHtml = "";
     if (tabMode === '13d') {
-        fullHtml = generateTableHtml('kmeans_cluster', 'Global 13D K-Means');
+        fullHtml = generateTableHtml('kmeans_cluster', 'Global N-Dim K-Means');
     } else {
-        // Double table for Tab 2
         fullHtml = generateTableHtml('pca_kmeans_cluster', 'PCA 2D K-Means');
         fullHtml += generateTableHtml('mds_kmeans_cluster', 'MDS 2D K-Means');
     }
@@ -560,19 +528,15 @@ function updateConfusionMatrix(activePoints, tabMode) {
     d3.select("#cm-table").html(fullHtml);
 }
 
-// --- SINGLE POINT CLICK LOGIC ---
-// Handles isolation, visual linking, and specific dynamic panel views
+// --- SYNC & INTERACTION ---
 function updateSelection(d) {
     selectedPoint = d;
     brushedPointsGlobal = []; 
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
 
-    // Reset Brushes immediately upon point click
-    d3.select("#pca-plot .brush-group").call(brushPCA.move, null);
-    d3.select("#mds-plot .brush-group").call(brushMDS.move, null);
-    d3.select("#kmeans-plot .brush-group").call(brushKMeans.move, null);
-    d3.select("#pca-plot-2d .brush-group").call(brushPCA2D.move, null);
-    d3.select("#mds-plot-2d .brush-group").call(brushMDS2D.move, null);
+    [brushPCA, brushMDS, brushKMeans, brushPCA2D, brushMDS2D].forEach(b => {
+        d3.selectAll(".brush-group").call(b.move, null);
+    });
 
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
@@ -584,11 +548,9 @@ function updateSelection(d) {
         d3.select("#neighbor-graph-container").classed("hidden-panel", false);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
 
-        // Identify local High-Dimensional Neighborhood
         const neighborIds = d.neighbors || [];
         const activeIds = new Set([d.id, ...neighborIds]);
 
-        // Dim non-neighbors across all plots
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.8 : 0.1))
             .attr("r", p => p.id === d.id ? currentPointSize * 1.5 : currentPointSize)
@@ -598,26 +560,20 @@ function updateSelection(d) {
             .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.6 : 0.05))
             .style("stroke-width", p => p.id === d.id ? 3 : 1.5);
 
-        // Bring active items to front
-        d3.selectAll(".pc-line:not(.filtered-out)").filter(p => activeIds.has(p.id) && p.id !== d.id).raise();
-        d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
-        d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id) && p.id !== d.id).raise();
-        d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === d.id).raise();
+        d3.selectAll(".pc-line:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
+        d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
 
         const kmeansXKey = scalesMap['kmeans'].xKey;
         const kmeansYKey = scalesMap['kmeans'].yKey;
 
-        // Draw physical links in scatterplots
         drawLines("pca", d, neighborIds, "pca_x", "pca_y", brushPCA);
         drawLines("mds", d, neighborIds, "mds_x", "mds_y", brushMDS);
         drawLines("kmeans", d, neighborIds, kmeansXKey, kmeansYKey, brushKMeans);
 
-        // Generate Node-Link Force Layout diagram
         const neighborsData = neighborIds.map(id => pointById.get(id)).filter(Boolean);
         drawNeighborGraph(d, neighborsData);
 
     } else {
-        // Tab 2D specific logic: Display Radar Chart
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
         d3.select("#radar-empty-state").classed("hidden-panel", true);
@@ -626,7 +582,6 @@ function updateSelection(d) {
 
         drawRadarChart(d);
 
-        // Isolate selected point visually
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : 0.1)
             .attr("r", p => p.id === d.id ? currentPointSize * 1.5 : currentPointSize)
@@ -640,7 +595,6 @@ function updateSelection(d) {
     }
 }
 
-// Draw line segments connecting a point to its true HD neighbors in a 2D plot
 function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
     const plotMapping = { pca: '#pca-plot', mds: '#mds-plot', kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
     const linkGroup = d3.select(`${plotMapping[plotId]} .link-group`);
@@ -658,13 +612,11 @@ function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
         .attr("y1", sourceY)
         .attr("x2", target => scalesMap[plotId].xScale(target[xKey]))
         .attr("y2", target => scalesMap[plotId].yScale(target[yKey]))
-        .attr("stroke", target => target.label === sourceD.label ? "#2ca02c" : "#e74c3c") // Green if same class, Red if false positive
+        .attr("stroke", target => target.label === sourceD.label ? "#2ca02c" : "#e74c3c")
         .attr("stroke-width", 1.5)
         .attr("opacity", 0.6);
 }
 
-// --- BI-DIRECTIONAL BRUSHING ---
-// Configure brushes so that interacting with one plot updates everything else synchronously
 function setupBrushing() {
     const brushList = [
         { obj: brushPCA, sel: "#pca-plot", id: "pca" },
@@ -676,7 +628,6 @@ function setupBrushing() {
 
     brushList.forEach(({obj: brush, id: plotId}) => {
         brush.on("start brush end", function (event) {
-            // Clear other brushes automatically when starting a new one
             if(event.sourceEvent && event.sourceEvent.type === "mousedown") {
                 brushList.filter(b => b.obj !== brush).forEach(b => {
                     d3.select(`${b.sel} .brush-group`).call(b.obj.move, null);
@@ -687,12 +638,10 @@ function setupBrushing() {
     });
 }
 
-// Calculate the spatial intersection of points inside the brushed area
 function handleBrush(event, brushObj, xKey, yKey) {
     if (!event.sourceEvent) return;
     d3.selectAll(".link-group line").remove(); 
 
-    // If brush is cleared
     if (!event.selection) {
         if (event.type === "end") {
             selectedPoint = null;
@@ -721,8 +670,6 @@ function handleBrush(event, brushObj, xKey, yKey) {
     updateLiveAnalytics(selectedPoints);
 }
 
-// --- DYNAMIC PANEL VIEW CONTROLLER ---
-// Decides which component (Gauges, Matrix, Radar, or Placeholder) to show based on selection state
 function updateLiveAnalytics(selectedPoints) {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     const isAnomalyOn = d3.select("#show-discrepancies").property("checked");
@@ -734,26 +681,22 @@ function updateLiveAnalytics(selectedPoints) {
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
         d3.select("#empty-state-placeholder").classed("hidden-panel", true);
         
-        // Tab 2 Requires EXACTLY ONE point selected to show the Radar Chart
         if (selectedPoints.length === 1) {
             d3.select("#dynamic-panel-title").text("Multidimensional Profile (Radar)");
             d3.select("#radar-empty-state").classed("hidden-panel", true);
             d3.select("#radar-chart-container").classed("hidden-panel", false);
             drawRadarChart(selectedPoints[0]);
         } else {
-            // Strict condition for Tab 2: Show empty text if not exactly 1 point
             d3.select("#dynamic-panel-title").text("Live Analytics");
             d3.select("#radar-chart-container").classed("hidden-panel", true);
             d3.select("#radar-empty-state").classed("hidden-panel", false);
         }
         
-        // Update Sankey only if multiple points are selected
         const activeData = selectedPoints.length > 1 ? selectedPoints : baseDataset;
         drawSankeyDiagram("#comparison-plot", activeData);
         return;
     }
 
-    // Logic for Tab 13D
     d3.select("#radar-empty-state").classed("hidden-panel", true);
     d3.select("#radar-chart-container").classed("hidden-panel", true);
 
@@ -765,7 +708,7 @@ function updateLiveAnalytics(selectedPoints) {
         if (isAnomalyOn) {
             d3.select("#empty-state-placeholder").classed("hidden-panel", true);
             d3.select("#confusion-matrix-container").classed("hidden-panel", false);
-            updateConfusionMatrix(baseDataset);
+            updateConfusionMatrix(baseDataset, currentTab);
         } else {
             d3.select("#confusion-matrix-container").classed("hidden-panel", true);
             d3.select("#empty-state-placeholder").classed("hidden-panel", false);
@@ -773,7 +716,6 @@ function updateLiveAnalytics(selectedPoints) {
         return;
     }
     
-    // Multiple points selected in 13D Tab - Show average metric gauges
     d3.select("#dynamic-panel-title").text("Selection Metrics");
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#neighbor-graph-container").classed("hidden-panel", true);
@@ -792,15 +734,14 @@ function updateLiveAnalytics(selectedPoints) {
     updateGauge(gauges.fscore, avgFScore, colorFScore(avgFScore), "#val-fscore");
 }
 
-// --- RADAR CHART (TAB 2) ---
-// Renders the overlapping polygons for Point, True Class Average, and KMeans Average
+// --- RADAR CHART ---
 function drawRadarChart(point) {
     const container = d3.select("#radar-chart-svg-container");
-    container.html(""); // Clear existing SVG
+    container.html(""); 
 
     const width = container.node().clientWidth || 300;
     const height = container.node().clientHeight || 250;
-    const margin = 45; // Generous margin so labels don't get clipped
+    const margin = 45; 
     const radius = Math.min(width / 2, height / 2) - margin;
 
     const svg = container.append("svg")
@@ -809,14 +750,12 @@ function drawRadarChart(point) {
         .append("g")
         .attr("transform", `translate(${width / 2},${height / 2})`);
 
-    // Helper function: Min-Max Normalization (0 to 1) for the given dimension
     const normalize = (dim, value) => {
         const {min, max} = radarMinMax[dim];
         if (max === min) return 0;
         return (value - min) / (max - min);
     };
 
-    // Calculate Cartesian coordinates based on polar angle for each dimension
     const getCoordinates = (dataObj) => {
         return radarDimensions.map((dim, i) => {
             let val = normalize(dim, dataObj[dim]);
@@ -828,7 +767,6 @@ function drawRadarChart(point) {
         });
     };
 
-    // 1. Draw Grid Concentric Reference Circles
     const ticks = [0.25, 0.5, 0.75, 1];
     svg.selectAll(".grid-circle")
         .data(ticks).enter()
@@ -838,7 +776,6 @@ function drawRadarChart(point) {
         .style("stroke", "#e0e0e0")
         .style("stroke-width", "0.5px");
 
-    // 2. Draw Spokes (Axes)
     const axes = svg.selectAll(".axis")
         .data(radarDimensions).enter()
         .append("g")
@@ -851,7 +788,6 @@ function drawRadarChart(point) {
         .style("stroke", "#bdc3c7")
         .style("stroke-width", "1px");
 
-    // 3. Draw Axis Labels
     axes.append("text")
         .attr("x", (d, i) => -(radius + 15) * Math.cos((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length)))
         .attr("y", (d, i) => -(radius + 15) * Math.sin((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length)))
@@ -864,10 +800,7 @@ function drawRadarChart(point) {
 
     const lineBuilder = d3.line().x(d => d.x).y(d => d.y).curve(d3.curveLinearClosed);
 
-    // 4. Draw Data Polygons
-    
-    // A) Ground Truth (Original Producer Average) -> Distinct Blue, No Fill, Solid Line
-    const origData = origClusterAvg[point.label];
+    const origData = origClusterAvg[String(point.label)];
     if (origData) {
         svg.append("path")
             .datum(getCoordinates(origData))
@@ -877,20 +810,18 @@ function drawRadarChart(point) {
             .style("stroke-width", "2px");
     }
 
-    // B) K-Means Cluster Average (PCA Based classification) -> Distinct Purple, No Fill, Solid Line
-    const kmeansData = kmeansClusterAvg[point.pca_kmeans_cluster];
+    const kmeansData = kmeansClusterAvg[String(point.pca_kmeans_cluster)];
     if (kmeansData) {
         svg.append("path")
             .datum(getCoordinates(kmeansData))
             .attr("d", lineBuilder)
             .style("fill", "none")
-            .style("stroke", "#228B22")
+            .style("stroke", "#8e44ad")
             .style("stroke-width", "2px");
     }
 
-    // C) Actual Selected Point Attributes -> Distinct Red, No Fill, Solid Line
     const pointData = {};
-    radarDimensions.forEach(dim => pointData[dim] = +point.attributes[dim]); // Ensure numerical values
+    radarDimensions.forEach(dim => pointData[dim] = +point.attributes[dim]); 
     
     svg.append("path")
         .datum(getCoordinates(pointData))
@@ -899,7 +830,6 @@ function drawRadarChart(point) {
         .style("stroke", "#e74c3c")
         .style("stroke-width", "2.5px");
         
-    // Draw explicit vertex dots for the selected point
     svg.selectAll(".radar-point")
         .data(getCoordinates(pointData))
         .enter().append("circle")
@@ -908,9 +838,7 @@ function drawRadarChart(point) {
         .style("fill", "#c0392b");
 }
 
-
-// --- GENERAL UI HELPERS ---
-// Clears highlight styles
+// --- UTILITIES ---
 function resetAllHovers() {
     if (selectedPoint) {
         d3.selectAll(".dot")
@@ -939,18 +867,28 @@ function enhanceColorModeSwitcher() {
     ];
 
     const container = d3.select(".control-group");
-    if (container.empty()) { return; }
+    if (container.empty()) return;
     container.html(""); 
 
     container.classed("control-group", false).classed("segmented-control", true);
 
+    // Dynamically attach the event listener directly to avoid it being lost on re-render
     options.forEach((opt, i) => {
-        container.append("input").attr("type", "radio").attr("id", `cm-${opt.value}`).attr("name", "colorMode").attr("value", opt.value).property("checked", i === 0); 
+        container.append("input")
+            .attr("type", "radio")
+            .attr("id", `cm-${opt.value}`)
+            .attr("name", "colorMode")
+            .attr("value", opt.value)
+            .property("checked", opt.value === colorMode)
+            .on("change", function() {
+                colorMode = this.value;
+                updateColors();
+                updateLegend();
+            }); 
         container.append("label").attr("for", `cm-${opt.value}`).text(opt.label);
     });
 }
 
-// Scale accessors
 function getColor(d) {
     if (colorMode === 'original') return colorOriginal(d.label);
     if (colorMode === 'precision') return colorPrecision(d.precision);
@@ -958,7 +896,6 @@ function getColor(d) {
     if (colorMode === 'fscore') return colorFScore(d.f_score);
 }
 
-// Animate color changes across all views
 function updateColors() {
     d3.selectAll(".dot.dot-pca").transition().duration(500).attr("fill", d => getColor(d));
     d3.selectAll(".dot.dot-mds").transition().duration(500).attr("fill", d => getColor(d));
@@ -995,7 +932,7 @@ function updateLegend() {
         uniqueClasses.forEach(cls => {
             const item = gradient.append("div").attr("class", "legend-cluster-item");
             item.append("div").attr("class", "legend-cluster-dot").style("background-color", colorOriginal(cls));
-            item.append("span").text(`Prod ${cls}`);
+            item.append("span").text(cls); 
         });
         
         const anomalyItem = gradient.append("div").attr("class", "legend-cluster-item");
@@ -1019,15 +956,11 @@ function updateLegend() {
     }
 }
 
-// Initial draw logic for half-circle gauges
 function initGauge(selector, gaugeObj) {
     const svg = d3.select(selector);
     const width = 100, height = 60;
 
-    svg.attr("viewBox", `0 0 ${width} ${height}`)
-       .style("width", "100%")
-       .style("height", "100%");
-
+    svg.attr("viewBox", `0 0 ${width} ${height}`).style("width", "100%").style("height", "100%");
     const g = svg.append("g").attr("transform", `translate(${width/2},${height - 5})`);
     const arcBg = d3.arc().innerRadius(30).outerRadius(45).startAngle(-Math.PI / 2).endAngle(Math.PI / 2);
     g.append("path").attr("d", arcBg).attr("fill", "#e0e0e0");
@@ -1036,7 +969,6 @@ function initGauge(selector, gaugeObj) {
     gaugeObj.foreground = g.append("path").datum({ endAngle: -Math.PI / 2 }).attr("fill", "#bdc3c7").attr("d", arcFg);
 }
 
-// Animate arc to new percentage
 function updateGauge(gaugeObj, value, color, textSelector) {
     const targetAngle = gaugeAngleScale(value);
     const arcFg = d3.arc().innerRadius(30).outerRadius(45).startAngle(-Math.PI / 2).cornerRadius(3);
@@ -1054,7 +986,6 @@ function updateGauge(gaugeObj, value, color, textSelector) {
         .attr("fill", color);
 }
 
-// Base tooltip showing local quality metrics
 function showTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
     
@@ -1081,17 +1012,16 @@ function showTooltip(event, d) {
         </div>
     `);
 
-    // Ensure tooltip stays on screen
     const tooltipNode = tooltip.node();
     const tooltipWidth = tooltipNode.offsetWidth;
     const tooltipHeight = tooltipNode.offsetHeight;
     const margin = 20;
 
     let x = event.pageX + margin;
-    if (x + tooltipWidth > window.innerWidth) { x = event.pageX - tooltipWidth - margin; }
+    if (x + tooltipWidth > window.innerWidth) x = event.pageX - tooltipWidth - margin;
 
     let y = event.pageY + margin;
-    if (y + tooltipHeight > window.innerHeight) { y = event.pageY - tooltipHeight - margin; }
+    if (y + tooltipHeight > window.innerHeight) y = event.pageY - tooltipHeight - margin;
 
     tooltip.style("left", x + "px").style("top", y + "px").transition().duration(100).style("opacity", 1);
 }
@@ -1100,7 +1030,6 @@ function hideTooltip() {
     d3.select("#tooltip").transition().duration(200).style("opacity", 0);
 }
 
-// Extended tooltip for nodes displaying all extracted physical/chemical attributes
 function showAttributeTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
     if (!d.attributes) return showTooltip(event, d); 
@@ -1118,14 +1047,13 @@ function showAttributeTooltip(event, d) {
     const margin = 20;
 
     let x = event.pageX + margin;
-    if (x + tooltipWidth > window.innerWidth) { x = event.pageX - tooltipWidth - margin; }
+    if (x + tooltipWidth > window.innerWidth) x = event.pageX - tooltipWidth - margin;
     let y = event.pageY + margin;
-    if (y + tooltipHeight > window.innerHeight) { y = event.pageY - tooltipHeight - margin; }
+    if (y + tooltipHeight > window.innerHeight) y = event.pageY - tooltipHeight - margin;
 
     tooltip.style("left", x + "px").style("top", y + "px").transition().duration(100).style("opacity", 1);
 }
 
-// Generate D3 Force graph for local neighborhood topology mapping
 function drawNeighborGraph(centerNode, neighborNodes) {
     const svg = d3.select("#neighbor-graph-svg");
     svg.selectAll("*").remove();
@@ -1155,7 +1083,6 @@ function drawNeighborGraph(centerNode, neighborNodes) {
         centerGraphNode.fy = size / 2;
     }
 
-    // Force simulation configurations
     const simulation = d3.forceSimulation(graphNodes)
         .force("link", d3.forceLink(graphLinks).id(d => d.id).distance(size / 3.2).strength(0.7))
         .force("charge", d3.forceManyBody().strength(-size * 1.5))
@@ -1192,7 +1119,6 @@ function drawNeighborGraph(centerNode, neighborNodes) {
     });
 }
 
-// Drag interactions for Force graph
 function drag(simulation, centerNode, size) {
     function dragstarted(event, d) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -1213,8 +1139,6 @@ function drag(simulation, centerNode, size) {
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
 }
 
-// --- SANKEY DIAGRAM (PCA 2D vs MDS 2D) ---
-// Analyzes the flow/discrepancy of elements between PCA-based clusters and MDS-based clusters
 function drawSankeyDiagram(selector, activeData) {
     const container = d3.select(selector);
     if (container.empty()) return;
@@ -1241,8 +1165,8 @@ function drawSankeyDiagram(selector, activeData) {
         .append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    const pcaClusters = Array.from(new Set(activeData.map(d => d.pca_kmeans_cluster).filter(c => c !== undefined))).sort();
-    const mdsClusters = Array.from(new Set(activeData.map(d => d.mds_kmeans_cluster).filter(c => c !== undefined))).sort();
+    const pcaClusters = Array.from(new Set(activeData.map(d => String(d.pca_kmeans_cluster)).filter(c => c !== "undefined"))).sort();
+    const mdsClusters = Array.from(new Set(activeData.map(d => String(d.mds_kmeans_cluster)).filter(c => c !== "undefined"))).sort();
 
     if (pcaClusters.length === 0 || mdsClusters.length === 0) return;
 
@@ -1268,7 +1192,7 @@ function drawSankeyDiagram(selector, activeData) {
             const targetName = `MDS C${d.mds_kmeans_cluster}`;
             const key = `${sourceName}->${targetName}`;
             
-            const isDiscrepancy = d.pca_kmeans_cluster !== d.mds_kmeans_cluster;
+            const isDiscrepancy = String(d.pca_kmeans_cluster) !== String(d.mds_kmeans_cluster);
             
             if (!linkMap.has(key)) {
                 linkMap.set(key, { 
@@ -1304,7 +1228,6 @@ function drawSankeyDiagram(selector, activeData) {
 
     graph.links.sort((a, b) => (a.isDiscrepancy === b.isDiscrepancy ? 0 : a.isDiscrepancy ? 1 : -1));
 
-    // Draw the links (flows)
     const linkGroup = svg.append("g")
         .attr("fill", "none")
         .selectAll("g")
@@ -1339,7 +1262,6 @@ function drawSankeyDiagram(selector, activeData) {
         .append("title")
         .text(d => `${d.source.name} → ${d.target.name}\n${d.value} points${d.isDiscrepancy ? ' (DISCREPANCY)' : ''}`);
 
-    // Update to make numbers on streams larger and highly visible
     linkGroup.append("text")
         .attr("x", d => d.source.x1 + (d.target.x0 - d.source.x1) / 2)
         .attr("y", d => d.y0 + (d.y1 - d.y0) / 2)
@@ -1348,11 +1270,10 @@ function drawSankeyDiagram(selector, activeData) {
         .style("fill", "#ffffff")
         .style("font-size", "15px")
         .style("font-weight", "900")
-        .style("text-shadow", "0px 0px 4px #000000, 0px 0px 8px #000000") // Strong contrast stroke effect
+        .style("text-shadow", "0px 0px 4px #000000, 0px 0px 8px #000000") 
         .style("pointer-events", "none") 
         .text(d => d.value);
 
-    // Draw the nodes (blocks)
     const node = svg.append("g")
         .selectAll("rect")
         .data(graph.nodes)
@@ -1382,12 +1303,9 @@ function drawSankeyDiagram(selector, activeData) {
         .text(d => `${d.name} (${d.value})`);
 }
 
-// --- PARALLEL COORDINATES PLOT (13D TAB) ---
-// Multidimensional profile mapping for ALL dataset columns
 function drawParallelCoordinates(containerSelector) {
     const container = d3.select(containerSelector); 
     if (container.empty()) return;
-    
     container.html("");
 
     const width = container.node().clientWidth;
@@ -1413,28 +1331,19 @@ function drawParallelCoordinates(containerSelector) {
         if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
     });
 
-    const svg = svgRoot.append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+    const svg = svgRoot.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
     if (!dataset || dataset.length === 0 || !dataset[0].attributes) return;
 
-    // Use dynamically assigned dimensions
     const features = radarDimensions;
-
-    const x = d3.scalePoint()
-        .range([0, innerWidth])
-        .padding(0.1)
-        .domain(features);
+    const x = d3.scalePoint().range([0, innerWidth]).padding(0.1).domain(features);
 
     const y = {};
     features.forEach(f => {
         const extent = d3.extent(dataset, d => +d.attributes[f]);
         const minVal = Math.min(0, extent[0]);
         const maxVal = Math.max(0, extent[1]);
-        y[f] = d3.scaleLinear()
-            .domain([minVal, maxVal])
-            .range([innerHeight, 0])
-            .nice();
+        y[f] = d3.scaleLinear().domain([minVal, maxVal]).range([innerHeight, 0]).nice();
     });
 
     function path(d) {
@@ -1462,8 +1371,7 @@ function drawParallelCoordinates(containerSelector) {
               .attr("r", currentPointSize * 1.6)
               .attr("stroke", "rgba(0,0,0,0.9)")
               .attr("stroke-width", 2).raise();
-            d3.selectAll(`.pc-line.pt-${d.id}`)
-              .style("stroke-width", 3).raise();
+            d3.selectAll(`.pc-line.pt-${d.id}`).style("stroke-width", 3).raise();
             showAttributeTooltip(event, d);
         })
         .on("mouseout", function() { resetAllHovers(); })

@@ -4,7 +4,6 @@
         "k_neighbors_used": 15,
         "global_assessment": {
             "global_f_score": 0.385,
-            "message": "38.5% of the expected cluster structure is supported by original relationships.",
             "pca": {
                 "trustworthiness": 0.8974,
                 "continuity": 0.9428

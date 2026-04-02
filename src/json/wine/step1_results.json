@@ -3,8 +3,7 @@
         "dataset": "wine.csv",
         "k_neighbors_used": 15,
         "global_assessment": {
-            "global_f_score": 0.385,
-            "message": "38.5% of the expected cluster structure is supported by original relationships."
+            "global_f_score": 0.385
         }
     },
     "points": [

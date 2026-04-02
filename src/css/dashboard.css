@@ -152,14 +152,16 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 }
 
 /* =========================================
-   LEGEND CONTAINER
+   LEGEND CONTAINER (Right Side)
    ========================================= */
 .controls-right {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-width: 250px; 
     height: 100%; 
+    flex: 1; 
+    padding-left: 20px;
+    overflow: hidden; 
 }
 
 #legend-gradient {
@@ -168,6 +170,7 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap; 
 }
 
 .legend-color-block { flex: 1; height: 100%; }
@@ -177,13 +180,13 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     flex-direction: row;
     align-items: center;
     gap: 5px;
-    font-size: 0.8rem;
+    font-size: 0.75rem; 
     font-weight: bold;
 }
 
 .legend-cluster-dot {
-    width: 12px;
-    height: 12px;
+    width: 10px; 
+    height: 10px;
     border-radius: 50%;
     border: 1px solid #ccc;
 }
@@ -250,7 +253,7 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     height: 100%;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: center; /* FIX FATAL ERROR HERE */
     padding: 0;
     overflow: hidden;
 }
