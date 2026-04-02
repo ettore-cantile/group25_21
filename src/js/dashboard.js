@@ -141,6 +141,7 @@ Promise.all([
     d3.selectAll(".tab-13d").classed("hidden-panel", false);
 
     drawParallelCoordinates("#pc-plot");
+    drawSankeyDiagram("#comparison-plot", dataset);
     
     setupBrushing();
     
@@ -194,6 +195,11 @@ Promise.all([
             d3.select("#app-grid").classed("mode-2d", true);
             d3.selectAll(".tab-13d").classed("hidden-panel", true);
             d3.selectAll(".tab-2d").classed("hidden-panel", false);
+            
+            const activeData = brushedPointsGlobal.length > 1 
+                ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall)
+                : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
+            drawSankeyDiagram("#comparison-plot", activeData);
         }
 
         if (selectedPoint) {
@@ -321,11 +327,21 @@ function applyFilters() {
     if(d3.select("#show-discrepancies").property("checked")) {
         toggleDiscrepancies(true);
     }
+    
+    const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+    if (currentTab === '2d') {
+         const activeData = brushedPointsGlobal.length > 1 
+            ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall) 
+            : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
+         drawSankeyDiagram("#comparison-plot", activeData);
+    }
 }
 
 // --- VISUALIZING ANOMALIES VIA CENTROIDS ---
 function toggleDiscrepancies(show) {
     const plotMapping = { pca: '#pca-plot', mds: '#mds-plot', kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
+    const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+
     if (show) {
         Object.keys(plotMapping).forEach(plotId => {
             const scales = scalesMap[plotId];
@@ -394,28 +410,32 @@ function toggleDiscrepancies(show) {
             .style("opacity", d => d.is_anomaly ? 1.0 : 0.1)
             .style("stroke-width", d => d.is_anomaly ? 2.5 : 1);
 
-        const currentTab = d3.select("input[name='mainTab']:checked").node().value;
         let activePoints;
         if (currentTab === '13d') {
             activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
         } else {
-            // For Tab 2D, matrix is NEVER filtered by selected points
             activePoints = dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
         }
         updateConfusionMatrix(activePoints);
+        
     } else {
         Object.values(plotMapping).forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9).attr("stroke-width", 0.8);
         d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
+        
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-        d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+        
+        if (currentTab === '2d' && (selectedPoint || brushedPointsGlobal.length > 0)) {
+            d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+        } else if (currentTab === '2d') {
+            d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+        }
     }
 }
 
 function updateConfusionMatrix(activePoints) {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     
-    d3.select("#dynamic-panel-title").text("Cluster Discrepancies");
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
     d3.select("#neighbor-graph-container").classed("hidden-panel", true);
@@ -424,6 +444,10 @@ function updateConfusionMatrix(activePoints) {
     const classes = Array.from(new Set(dataset.map(d => String(d.label)))).sort();
     
     if (currentTab === '13d') {
+        d3.select("#dynamic-panel-title").text("Cluster Discrepancies");
+        d3.select("#cm-main-title").style("display", "block");
+        d3.select("#cm-desc").style("display", "block");
+        
         const matrix = {};
         classes.forEach(r => {
             matrix[r] = {};
@@ -460,6 +484,10 @@ function updateConfusionMatrix(activePoints) {
         d3.select("#cm-table").html(html);
         
     } else {
+        d3.select("#dynamic-panel-title").text("Global Discrepancies (2D)");
+        d3.select("#cm-main-title").style("display", "none");
+        d3.select("#cm-desc").style("display", "none");
+        
         const matrixPCA = {};
         const matrixMDS = {};
         classes.forEach(r => {
@@ -484,10 +512,10 @@ function updateConfusionMatrix(activePoints) {
         });
 
         const generateTableHTML = (title, matrix) => {
-            let html = `<h4 style='margin:0 0 10px 0; color: #2c3e50; font-size:0.95rem; text-align:center;'>${title}</h4>`;
-            html += "<table style='border-collapse: collapse; width: 100%; text-align: center; font-size: 0.85rem; margin-bottom: 25px;'>";
+            let html = `<h4 style='margin:0 0 5px 0; color: #2c3e50; font-size:0.85rem; text-align:center;'>${title}</h4>`;
+            html += "<table style='border-collapse: collapse; width: 100%; text-align: center; font-size: 0.85rem;'>";
             html += "<thead><tr><th style='border-bottom: 2px solid #ccc; font-weight:normal; text-align:left; padding-bottom:8px;'>Abstract ↓ \\ KMeans →</th>";
-            classes.forEach(c => { html += `<th style='padding-bottom:8px;'>Matched C${c}</th>`; });
+            classes.forEach(c => { html += `<th style='padding-bottom:8px;'>C${c}</th>`; });
             html += "</tr></thead><tbody>";
             classes.forEach(row => {
                 html += `<tr><td style='font-weight:bold; border-right: 2px solid #eee; text-align:left; padding: 6px 0;'>Prod ${row}</td>`;
@@ -505,8 +533,7 @@ function updateConfusionMatrix(activePoints) {
             return html;
         };
 
-        // Riorganizzazione spaziale: uso di flexbox e distribuzione equa
-        let finalHtml = `<div style="display:flex; flex-direction:column; justify-content:space-around; height:100%; width:100%; padding-top:10px;">`;
+        let finalHtml = `<div style="display:flex; flex-direction:column; justify-content:space-around; height:100%; width:100%; padding: 5px 0;">`;
         finalHtml += `<div>${generateTableHTML("PCA 2D K-Means", matrixPCA)}</div>`;
         finalHtml += `<div>${generateTableHTML("MDS 2D K-Means", matrixMDS)}</div>`;
         finalHtml += `</div>`;
@@ -521,6 +548,7 @@ function updateSelection(d) {
     selectedPoint = d;
     brushedPointsGlobal = []; 
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+    const isAnomalyOn = d3.select("#show-discrepancies").property("checked");
 
     d3.select("#pca-plot .brush-group").call(brushPCA.move, null);
     d3.select("#mds-plot .brush-group").call(brushMDS.move, null);
@@ -530,11 +558,11 @@ function updateSelection(d) {
 
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
-    d3.select("#confusion-matrix-container").classed("hidden-panel", true);
 
     if (currentTab === '13d') {
         d3.select("#dynamic-panel-title").text("Neighbor Graph");
         d3.select("#neighbor-graph-container").classed("hidden-panel", false);
+        d3.select("#confusion-matrix-container").classed("hidden-panel", true);
 
         const neighborIds = d.neighbors || [];
         const activeIds = new Set([d.id, ...neighborIds]);
@@ -564,8 +592,17 @@ function updateSelection(d) {
         drawNeighborGraph(d, neighborsData);
 
     } else {
-        d3.select("#dynamic-panel-title").text("Point Details");
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
+
+        if (isAnomalyOn) {
+            d3.select("#dynamic-panel-title").text("Point Details & Discrepancies");
+            d3.select("#confusion-matrix-container").classed("hidden-panel", false);
+            const baseDataset = dataset.filter(p => p.precision >= minPrecision && p.recall >= minRecall);
+            updateConfusionMatrix(baseDataset);
+        } else {
+            d3.select("#dynamic-panel-title").text("Point Details (2D)");
+            d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+        }
 
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : 0.1)
@@ -573,8 +610,11 @@ function updateSelection(d) {
             .attr("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
         d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === d.id).raise();
-
         d3.selectAll(".link-group line").remove();
+
+        // Single point draws the GLOBAL sankey, not the filtered one
+        const baseDataset = dataset.filter(p => p.precision >= minPrecision && p.recall >= minRecall);
+        drawSankeyDiagram("#comparison-plot", baseDataset);
     }
 }
 
@@ -656,30 +696,43 @@ function handleBrush(event, brushObj, xKey, yKey) {
 // --- LOGIC TO UPDATE GAUGES AND DYNAMIC PANEL ---
 function updateLiveAnalytics(selectedPoints) {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+    const isAnomalyOn = d3.select("#show-discrepancies").property("checked");
+    const baseDataset = dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
 
     if (currentTab === '2d') {
-        // Tab 2D: Nessun tachimetro e nessuna etichetta "Selected points"
         d3.select("#gauges-container").classed("hidden-panel", true);
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
         
-        if (d3.select("#show-discrepancies").property("checked")) {
-            d3.select("#dynamic-panel-title").text("2D Cluster Discrepancies");
+        if (selectedPoints.length > 0) {
             d3.select("#empty-state-placeholder").classed("hidden-panel", true);
-            d3.select("#confusion-matrix-container").classed("hidden-panel", false);
             
-            const cmContainer = d3.select("#confusion-matrix-container");
-            cmContainer.select("h4").style("display", "none");
-            cmContainer.select("p").style("display", "none");
+            if (isAnomalyOn) {
+                d3.select("#dynamic-panel-title").text("2D Cluster Discrepancies");
+                d3.select("#confusion-matrix-container").classed("hidden-panel", false);
+                updateConfusionMatrix(baseDataset); 
+            } else {
+                d3.select("#dynamic-panel-title").text("Selection Active (2D)");
+                d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+            }
             
-            // Nella Tab 2, non filtriamo la matrice in base alla selezione dell'utente
-            const activePoints = dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
-            updateConfusionMatrix(activePoints);
+            // Filtro Sankey SOLO se seleziono più di 1 punto
+            const activeData = selectedPoints.length > 1 ? selectedPoints : baseDataset;
+            drawSankeyDiagram("#comparison-plot", activeData);
+            
         } else {
-            d3.select("#dynamic-panel-title").text("Live Analytics");
-            d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-            d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+            if (isAnomalyOn) {
+                d3.select("#dynamic-panel-title").text("2D Cluster Discrepancies");
+                d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+                d3.select("#confusion-matrix-container").classed("hidden-panel", false);
+                updateConfusionMatrix(baseDataset);
+            } else {
+                d3.select("#dynamic-panel-title").text("Live Analytics");
+                d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+                d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+            }
+            drawSankeyDiagram("#comparison-plot", baseDataset);
         }
-        return; // Terminazione anticipata per la Tab 2
+        return;
     }
 
     // Logic for Tab 13D
@@ -688,16 +741,10 @@ function updateLiveAnalytics(selectedPoints) {
         d3.select("#gauges-container").classed("hidden-panel", true);
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
         
-        if (d3.select("#show-discrepancies").property("checked")) {
+        if (isAnomalyOn) {
             d3.select("#empty-state-placeholder").classed("hidden-panel", true);
             d3.select("#confusion-matrix-container").classed("hidden-panel", false);
-            
-            const cmContainer = d3.select("#confusion-matrix-container");
-            cmContainer.select("h4").style("display", "block");
-            cmContainer.select("p").style("display", "block");
-            
-            const activePoints = dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
-            updateConfusionMatrix(activePoints);
+            updateConfusionMatrix(baseDataset);
         } else {
             d3.select("#confusion-matrix-container").classed("hidden-panel", true);
             d3.select("#empty-state-placeholder").classed("hidden-panel", false);
@@ -791,7 +838,6 @@ function updateColors() {
     });
 }
 
-// --- LEGENDA ---
 function updateLegend() {
     const gradient = d3.select("#legend-gradient");
     const labelsDiv = d3.select("#legend-labels");
@@ -831,7 +877,6 @@ function updateLegend() {
     }
 }
 
-// --- GAUGES ---
 function initGauge(selector, gaugeObj) {
     const svg = d3.select(selector);
     const width = 100, height = 60;
@@ -865,7 +910,6 @@ function updateGauge(gaugeObj, value, color, textSelector) {
         .attr("fill", color);
 }
 
-// --- TOOLTIPS ESATTI ---
 function showTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
     
@@ -934,7 +978,6 @@ function showAttributeTooltip(event, d) {
     tooltip.style("left", x + "px").style("top", y + "px").transition().duration(100).style("opacity", 1);
 }
 
-// --- NEIGHBOR GRAPH ---
 function drawNeighborGraph(centerNode, neighborNodes) {
     const svg = d3.select("#neighbor-graph-svg");
     svg.selectAll("*").remove();
@@ -949,6 +992,9 @@ function drawNeighborGraph(centerNode, neighborNodes) {
     
     const g = svg.append("g").attr("transform", `translate(${xOffset}, ${yOffset})`);
 
+    const centerRadius = Math.max(10, size * 0.06); 
+    const neighborRadius = Math.max(6, size * 0.04);
+
     const graphNodes = [centerNode, ...neighborNodes].map(n => ({...n}));
     const graphLinks = neighborNodes.map(n => ({
         source: centerNode.id,
@@ -962,8 +1008,8 @@ function drawNeighborGraph(centerNode, neighborNodes) {
     }
 
     const simulation = d3.forceSimulation(graphNodes)
-        .force("link", d3.forceLink(graphLinks).id(d => d.id).distance(size / 3.5).strength(0.7))
-        .force("charge", d3.forceManyBody().strength(-size * 1.8))
+        .force("link", d3.forceLink(graphLinks).id(d => d.id).distance(size / 3.2).strength(0.7))
+        .force("charge", d3.forceManyBody().strength(-size * 1.5))
         .force("center", d3.forceCenter(size / 2, size / 2));
 
     const link = g.append("g")
@@ -980,7 +1026,7 @@ function drawNeighborGraph(centerNode, neighborNodes) {
         .call(drag(simulation, centerNode, size));
 
     node.append("circle")
-        .attr("r", d => d.id === centerNode.id ? 20 : 15)
+        .attr("r", d => d.id === centerNode.id ? centerRadius : neighborRadius)
         .attr("fill", d => colorOriginal(d.label))
         .style("cursor", "pointer")
         .on("mouseover", function(event, d) {
@@ -1017,7 +1063,175 @@ function drag(simulation, centerNode, size) {
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
 }
 
-// --- PARALLEL COORDINATES ---
+// --- SANKEY DIAGRAM (PCA 2D vs MDS 2D) ---
+function drawSankeyDiagram(selector, activeData) {
+    const container = d3.select(selector);
+    if (container.empty()) return;
+    container.html("");
+
+    if (!activeData || activeData.length === 0) {
+        container.append("div")
+                 .style("text-align", "center")
+                 .style("padding-top", "30px")
+                 .style("color", "#7f8c8d")
+                 .style("font-size", "0.9rem")
+                 .text("No points selected for comparison.");
+        return;
+    }
+
+    const width = container.node().clientWidth;
+    const height = container.node().clientHeight;
+    const margin = { top: 15, right: 40, bottom: 15, left: 40 };
+
+    const svg = container.append("svg")
+        .attr("viewBox", `0 0 ${width} ${height}`)
+        .style("width", "100%")
+        .style("height", "100%")
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    const pcaClusters = Array.from(new Set(activeData.map(d => d.pca_kmeans_cluster).filter(c => c !== undefined))).sort();
+    const mdsClusters = Array.from(new Set(activeData.map(d => d.mds_kmeans_cluster).filter(c => c !== undefined))).sort();
+
+    if (pcaClusters.length === 0 || mdsClusters.length === 0) return;
+
+    const nodes = [];
+    const nodeMap = new Map();
+    let nodeIndex = 0;
+
+    pcaClusters.forEach(c => {
+        const name = `PCA C${c}`;
+        nodes.push({ name: name, type: 'pca', cluster: c });
+        nodeMap.set(name, nodeIndex++);
+    });
+    mdsClusters.forEach(c => {
+        const name = `MDS C${c}`;
+        nodes.push({ name: name, type: 'mds', cluster: c });
+        nodeMap.set(name, nodeIndex++);
+    });
+
+    const linkMap = new Map();
+    activeData.forEach(d => {
+        if (d.pca_kmeans_cluster !== undefined && d.mds_kmeans_cluster !== undefined) {
+            const sourceName = `PCA C${d.pca_kmeans_cluster}`;
+            const targetName = `MDS C${d.mds_kmeans_cluster}`;
+            const key = `${sourceName}->${targetName}`;
+            
+            const isDiscrepancy = d.pca_kmeans_cluster !== d.mds_kmeans_cluster;
+            
+            if (!linkMap.has(key)) {
+                linkMap.set(key, { 
+                    source: nodeMap.get(sourceName), 
+                    target: nodeMap.get(targetName), 
+                    value: 0,
+                    isDiscrepancy: isDiscrepancy,
+                    points: [] // Memorizziamo i punti esatti che fanno questo percorso
+                });
+            }
+            linkMap.get(key).value += 1;
+            linkMap.get(key).points.push(d);
+        }
+    });
+
+    const links = Array.from(linkMap.values());
+
+    const sankey = d3.sankey()
+        .nodeWidth(20)
+        .nodePadding(15)
+        .extent([[0, 0], [width - margin.left - margin.right, height - margin.top - margin.bottom]]);
+
+    let graph;
+    try {
+        graph = sankey({
+            nodes: nodes.map(d => Object.assign({}, d)),
+            links: links.map(d => Object.assign({}, d))
+        });
+    } catch(e) {
+        console.error("Sankey mapping error:", e);
+        return;
+    }
+
+    graph.links.sort((a, b) => (a.isDiscrepancy === b.isDiscrepancy ? 0 : a.isDiscrepancy ? 1 : -1));
+
+    // Draw the links (flows)
+    const linkGroup = svg.append("g")
+        .attr("fill", "none")
+        .selectAll("g")
+        .data(graph.links)
+        .enter().append("g");
+
+    linkGroup.append("path")
+        .attr("d", d3.sankeyLinkHorizontal())
+        .attr("stroke", d => d.isDiscrepancy ? "#c0392b" : "#bdc3c7") 
+        .attr("stroke-width", d => d.isDiscrepancy ? Math.max(3, d.width) : Math.max(1, d.width))
+        .style("stroke-opacity", d => d.isDiscrepancy ? 0.85 : 0.25)
+        .attr("class", "sankey-link")
+        .style("cursor", "pointer")
+        .on("mouseover", function(event, d) {
+            d3.selectAll(".sankey-link").style("stroke-opacity", 0.1);
+            d3.select(this).style("stroke-opacity", 0.9).raise();
+        })
+        .on("mouseout", function() {
+            d3.selectAll(".sankey-link").style("stroke-opacity", l => l.isDiscrepancy ? 0.85 : 0.25);
+        })
+        // CLICK INTERACTION SU SUI FIUMI (Evidenzia i punti nei grafici)
+        .on("click", function(event, d) {
+            event.stopPropagation();
+            const linkPointIds = new Set(d.points.map(p => p.id));
+            
+            d3.selectAll(".dot:not(.filtered-out)")
+                .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
+                .attr("r", p => linkPointIds.has(p.id) ? currentPointSize * 1.5 : currentPointSize)
+                .attr("stroke-width", p => linkPointIds.has(p.id) ? 2 : 0.8);
+                
+            d3.selectAll(".dot:not(.filtered-out)").filter(p => linkPointIds.has(p.id)).raise();
+        })
+        .append("title")
+        .text(d => `${d.source.name} → ${d.target.name}\n${d.value} points${d.isDiscrepancy ? ' (DISCREPANCY)' : ''}`);
+
+    // Numeri al centro dei fiumi
+    linkGroup.append("text")
+        .attr("x", d => d.source.x1 + (d.target.x0 - d.source.x1) / 2)
+        .attr("y", d => d.y0 + (d.y1 - d.y0) / 2)
+        .attr("dy", "0.35em")
+        .attr("text-anchor", "middle")
+        .style("fill", "#2c3e50")
+        .style("font-size", "10px")
+        .style("font-weight", "bold")
+        .style("pointer-events", "none") // Impedisce al testo di bloccare l'hover/click sul fiume
+        .text(d => d.value);
+
+    // Draw the nodes (blocks)
+    const node = svg.append("g")
+        .selectAll("rect")
+        .data(graph.nodes)
+        .enter().append("rect")
+        .attr("x", d => d.x0)
+        .attr("y", d => d.y0)
+        .attr("height", d => Math.max(1, d.y1 - d.y0))
+        .attr("width", d => d.x1 - d.x0)
+        .attr("fill", d => colorKMeans(d.cluster))
+        .attr("stroke", "#2c3e50")
+        .attr("class", "sankey-node")
+        .append("title")
+        .text(d => `${d.name}\n${d.value} points`);
+
+    // Aggiunti i numeri totali direttamente alle etichette dei Nodi
+    svg.append("g")
+        .style("font-size", "11px")
+        .style("font-family", "sans-serif")
+        .style("font-weight", "bold")
+        .style("fill", "#2c3e50")
+        .selectAll("text")
+        .data(graph.nodes)
+        .enter().append("text")
+        .attr("x", d => d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6)
+        .attr("y", d => (d.y1 + d.y0) / 2)
+        .attr("dy", "0.35em")
+        .attr("text-anchor", d => d.x0 < width / 2 ? "start" : "end")
+        .text(d => `${d.name} (${d.value})`); // Mostra Nome + Valore
+}
+
 function drawParallelCoordinates(containerSelector) {
     const container = d3.select(containerSelector); 
     if (container.empty()) return;

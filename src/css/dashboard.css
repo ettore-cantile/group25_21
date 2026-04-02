@@ -10,7 +10,7 @@ body {
     padding: 0;
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
+    overflow: hidden !important; /* Prevents any scrolling */
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #eaeff1;
     color: #333;
@@ -22,7 +22,8 @@ body {
 #app-grid {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1.3fr) minmax(0, 1fr) 50px;
+    /* Fixed heights for top bars and footer to keep the screen exactly at 100vh */
+    grid-template-rows: 45px 55px minmax(0, 1.3fr) minmax(0, 1fr) 40px;
     grid-template-areas:
         "header header"
         "controls controls"
@@ -31,8 +32,8 @@ body {
         "footer footer";
     height: 100vh;
     width: 100vw;
-    gap: 12px;
-    padding-bottom: 12px;
+    gap: 10px;
+    padding-bottom: 10px;
 }
 
 /* 2D Tab Layout (Overrides grid areas) */
@@ -43,69 +44,88 @@ body {
         "plots analytics"
         "plots analytics"
         "footer footer";
+    grid-template-rows: 45px 55px minmax(0, 1fr) minmax(0, 1fr) 40px;
 }
 
 /* =========================================
-   HEADER & CONTROLS
+   HEADER & TAB SWITCHER
    ========================================= */
 .header {
     grid-area: header;
     background-color: #ffffff;
     border-bottom: 1px solid #ddd;
-    padding: 8px 15px;
+    padding: 0 15px;
     display: flex;
-    justify-content: space-between;
+    justify-content: space-between; /* Restored original spacing */
     align-items: center;
+    flex-wrap: nowrap;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
     z-index: 10;
 }
 
-h1 {
-    margin: 0;
-    font-size: 1.15rem;
-    color: #2c3e50;
+h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
+.subtitle { margin: 0; font-size: 0.8rem; color: #7f8c8d; white-space: nowrap; }
+
+/* Main Tab Switcher Styles (Restored large size) */
+.main-tab-switcher {
+    display: flex;
+    background-color: #e9ecef;
+    border-radius: 6px;
+    padding: 3px;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.subtitle {
-    margin: 0;
-    font-size: 0.8rem;
-    color: #7f8c8d;
+.main-tab-switcher input[type="radio"] { display: none; }
+
+.main-tab-switcher label {
+    flex: 1;
+    text-align: center;
+    padding: 6px 18px; /* Restored elegant padding */
+    font-size: 0.95rem; /* Restored font size */
+    font-weight: 600;
+    color: #495057;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    white-space: nowrap;
 }
 
-/* RIPRISTINATA ALTEZZA A 55PX */
+.main-tab-switcher input[type="radio"]:checked + label {
+    background-color: #ffffff;
+    color: #2980b9;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* =========================================
+   TOP CONTROLS & FILTERS
+   ========================================= */
 .top-controls {
     grid-area: controls;
     background: #ffffff;
-    padding: 8px 15px;
+    padding: 0 15px;
     display: flex;
     flex-direction: row;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
     z-index: 5;
-    margin-bottom: -5px;
-    height: 55px; 
+    height: 100%; 
+    overflow: hidden; /* Prevents overflow from breaking the layout */
 }
 
 .controls-left {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 15px;
+    gap: 15px; /* Restored original spacing */
+    white-space: nowrap;
 }
 
-.control-label {
-    color: #2c3e50;
-    font-size: 0.9rem;
-}
+.control-label { color: #2c3e50; font-size: 0.9rem; }
+.divider { width: 1px; height: 30px; background-color: #ddd; margin: 0 4px; }
 
-.divider {
-    width: 1px;
-    height: 30px;
-    background-color: #ddd;
-}
-
-/* Segmented Control Switcher */
+/* Segmented Control Generic (Filters) */
 .segmented-control {
     display: flex;
     background-color: #e9ecef;
@@ -114,9 +134,7 @@ h1 {
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.segmented-control input[type="radio"] {
-    display: none;
-}
+.segmented-control input[type="radio"] { display: none; }
 
 .segmented-control label {
     flex: 1;
@@ -128,7 +146,6 @@ h1 {
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
-    white-space: nowrap;
 }
 
 .segmented-control input[type="radio"]:checked + label {
@@ -137,12 +154,14 @@ h1 {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* RIPRISTINATO IL CONTAINER DI DESTRA AI SUOI 250PX ORIGINALI */
+/* =========================================
+   LEGEND CONTAINER
+   ========================================= */
 .controls-right {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-width: 250px; 
+    min-width: 250px; /* Restored original width so the legend is not squished */
     height: 100%; 
 }
 
@@ -154,10 +173,7 @@ h1 {
     justify-content: space-between;
 }
 
-.legend-color-block {
-    flex: 1;
-    height: 100%;
-}
+.legend-color-block { flex: 1; height: 100%; }
 
 .legend-cluster-item {
     display: flex;
@@ -169,7 +185,7 @@ h1 {
 }
 
 .legend-cluster-dot {
-    width: 12px;
+    width: 12px; /* Restored circular dot size */
     height: 12px;
     border-radius: 50%;
     border: 1px solid #ccc;
@@ -184,30 +200,30 @@ h1 {
     color: #555;
 }
 
-/* =========================================
-   PLOT GRID 3x1 (Left)
-   ========================================= */
-#plots-grid {
-    grid-area: plots;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: minmax(0, 1fr);
-    gap: 12px;
-    margin-left: 12px;
-    height: 100%;
-    width: calc(100% - 12px);
+/* Very subtle media query just to prevent complete breakage on very small screens, 
+   but retaining the exact original proportions */
+@media (max-width: 1400px) {
+    .controls-left { gap: 10px; }
+    .control-label { font-size: 0.85rem; }
+    .segmented-control label { padding: 4px 8px; font-size: 0.8rem; }
 }
 
-/* PLOT GRID 2x2 (Left - 2D Mode) */
-#plots-grid-2d {
+/* =========================================
+   PLOTS GRIDS
+   ========================================= */
+#plots-grid, #plots-grid-2d {
     grid-area: plots;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(2, minmax(0, 1fr));
     gap: 12px;
     margin-left: 12px;
     height: 100%;
-    width: calc(100% - 12px);
+}
+
+#plots-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+#plots-grid-2d { 
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
 .plot-container {
@@ -223,8 +239,8 @@ h1 {
 
 .plot-title {
     text-align: center;
-    padding: 8px;
-    font-size: 0.95rem;
+    padding: 6px;
+    font-size: 0.9rem;
     font-weight: 600;
     border-bottom: 1px solid #eee;
     background: #fafafa;
@@ -237,8 +253,6 @@ h1 {
     position: relative;
     width: 100%;
     height: 100%;
-    min-height: 0;
-    min-width: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -246,40 +260,29 @@ h1 {
     overflow: hidden;
 }
 
-svg text {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
+svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
-/* Centroid Anomalies Styles */
+/* Centroid & Anomalies Graphics */
 .centroid-link { stroke-dasharray: 2; opacity: 0.6; pointer-events: none; }
 .centroid-anomaly { stroke: #c0392b; stroke-width: 2px; opacity: 0.8; z-index: 50; stroke-dasharray: none; }
 .centroid-correct { stroke: #bdc3c7; stroke-width: 0.8px; opacity: 0.3; }
-
-.pc-line { transition: stroke 0.5s ease; }
-.pc-axis path, .pc-axis line { stroke: #34495e; stroke-width: 1.5px; }
-.pc-axis text {
-    paint-order: stroke;
-    stroke: #ffffff;
-    stroke-width: 3px;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-#pc-panel {
-    grid-area: pc;
-    margin: 0 12px;
-}
-
-/* Filtro Punti */
 .filtered-out { display: none !important; pointer-events: none; }
 
+/* Parallel Coordinates */
+.pc-line { transition: stroke 0.5s ease; }
+.pc-axis path, .pc-axis line { stroke: #34495e; stroke-width: 1.5px; }
+.pc-axis text { paint-order: stroke; stroke: #ffffff; stroke-width: 3px; stroke-linecap: round; stroke-linejoin: round; }
+#pc-panel { grid-area: pc; margin: 0 12px; }
+
+/* Sankey Diagram Styles */
+.sankey-link { transition: stroke-opacity 0.2s ease; cursor: pointer; }
+.sankey-node { cursor: pointer; }
+
+
 /* =========================================
-   DYNAMIC PANEL (Right)
+   DYNAMIC PANEL (Right Side)
    ========================================= */
-#panel-dynamic {
-    grid-area: analytics;
-    margin-right: 12px;
-}
+#panel-dynamic { grid-area: analytics; margin-right: 12px; }
 
 .dynamic-content-wrapper {
     width: 100%;
@@ -291,11 +294,9 @@ svg text {
     overflow: hidden;
 }
 
-.hidden-panel {
-    display: none !important;
-}
+.hidden-panel { display: none !important; }
 
-/* Placeholder Styling */
+/* Empty State / Placeholder */
 .placeholder-content {
     text-align: center;
     padding: 20px;
@@ -306,44 +307,21 @@ svg text {
     gap: 10px;
     max-width: 80%;
 }
+.placeholder-content p { margin: 0; font-weight: bold; font-size: 1.1rem; color: #2c3e50; }
+.placeholder-content span { font-size: 0.85rem; color: #7f8c8d; line-height: 1.4; }
 
-.placeholder-content p {
-    margin: 0;
-    font-weight: bold;
-    font-size: 1.2rem;
-    color: #2c3e50;
-}
-
-.placeholder-content span {
-    font-size: 0.9rem;
-    color: #7f8c8d;
-    line-height: 1.4;
-}
-
-/* Layout Gauges */
+/* Analytics Gauges */
 .stat-card {
     text-align: center;
-    padding: 8px 15px;
+    padding: 6px 15px;
     background: #f8f9fa;
     border-radius: 8px;
     border: 1px solid #eee;
     width: 80%;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
 }
-
-.stat-card h4 {
-    margin: 0 0 2px 0;
-    color: #7f8c8d;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-}
-
-.big-number {
-    font-size: 1.8rem;
-    font-weight: bold;
-    margin: 0;
-    color: #2980b9;
-}
+.stat-card h4 { margin: 0 0 2px 0; color: #7f8c8d; font-size: 0.75rem; text-transform: uppercase; }
+.big-number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #2980b9; }
 
 .gauges-wrapper {
     display: flex;
@@ -353,38 +331,14 @@ svg text {
     width: 100%;
     padding: 0 10px;
 }
+.gauge-container { display: flex; flex-direction: column; align-items: center; text-align: center; width: 32%; }
+.gauge-container h4 { margin: 0 0 5px 0; color: #2c3e50; font-size: 0.75rem; text-transform: uppercase; }
+.gauge-label { font-size: 0.95rem; font-weight: bold; margin-top: 5px; color: #2980b9; }
+.gauge-container svg { height: auto; max-height: 55px; width: 100%; max-width: 100px; }
 
-.gauge-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    width: 32%;
-}
-
-.gauge-container h4 {
-    margin: 0 0 5px 0;
-    color: #2c3e50;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-}
-
-.gauge-label {
-    font-size: 1.05rem;
-    font-weight: bold;
-    margin-top: 5px;
-    color: #2980b9;
-}
-
-.gauge-container svg {
-    height: auto;
-    max-height: 65px;
-    width: 100%;
-    max-width: 120px;
-}
 
 /* =========================================
-   FOOTER 
+   FOOTER
    ========================================= */
 .footer-stats {
     grid-area: footer;
@@ -403,28 +357,16 @@ svg text {
     justify-content: center;
     align-items: center;
     text-align: center;
-    padding: 6px;
+    padding: 4px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
     border: 1px solid #e1e8ed;
     border-top: 3px solid #3498db;
     overflow: hidden;
 }
 
-.footer-btn .fb-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    color: #7f8c8d;
-    font-weight: 600;
-    margin-bottom: 2px;
-    letter-spacing: 0.5px;
-    line-height: 1.2;
-}
+.footer-btn .fb-label { font-size: 0.65rem; text-transform: uppercase; color: #7f8c8d; font-weight: 600; margin-bottom: 2px; }
+.footer-btn .fb-value { font-size: 1rem; font-weight: bold; color: #2c3e50; }
 
-.footer-btn .fb-value {
-    font-size: 1.1rem;
-    font-weight: bold;
-    color: #2c3e50;
-}
 
 /* =========================================
    TOOLTIP AND EXTRA NODES
@@ -434,10 +376,10 @@ svg text {
     opacity: 0;
     background: rgba(30, 40, 50, 0.95);
     color: white;
-    padding: 12px;
+    padding: 10px;
     border-radius: 6px;
     pointer-events: none;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     line-height: 1.5;
     z-index: 1000;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -445,19 +387,6 @@ svg text {
     border-left: 4px solid #f1c40f;
 }
 
-.neighbor-link {
-    stroke: #999;
-    stroke-width: 1.5px;
-    stroke-opacity: 0.7;
-}
-
-.neighbor-node circle {
-    stroke: #fff;
-    stroke-width: 2px;
-    cursor: pointer;
-}
-
-.neighbor-node.center circle {
-    stroke: #f1c40f;
-    stroke-width: 4px;
-}
+.neighbor-link { stroke: #999; stroke-width: 1.5px; stroke-opacity: 0.7; }
+.neighbor-node circle { stroke: #fff; stroke-width: 2px; cursor: pointer; }
+.neighbor-node.center circle { stroke: #f1c40f; stroke-width: 4px; }

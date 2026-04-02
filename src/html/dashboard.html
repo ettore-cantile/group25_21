@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="../css/dashboard.css">
     <link rel="icon" href="./favicon.png">
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
 </head>
 <body>
 
@@ -16,7 +17,7 @@
                 <h1>Dimensionality Reduction Quality</h1>
                 <p class="subtitle">Comparing PCA and Euclidean MDS via Relationship Metrics</p>
             </div>
-            <div class="segmented-control main-tab-switcher" style="font-size: 1rem;">
+            <div class="segmented-control main-tab-switcher">
                 <input type="radio" id="tab-13d" name="mainTab" value="13d" checked>
                 <label for="tab-13d">MDS vs PCA 13D</label>
                 <input type="radio" id="tab-2d" name="mainTab" value="2d">
@@ -25,8 +26,7 @@
         </header>
 
         <section class="top-controls">
-            <div class="controls-left" style="display: flex; flex-wrap: wrap; align-items: center; gap: 15px;">
-                
+            <div class="controls-left">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="control-label"><strong>Color Scale:</strong></span>
                     <div class="control-group">
@@ -61,14 +61,14 @@
 
                 <div class="divider"></div>
 
-                <div style="display: flex; align-items: center; gap: 5px; margin-right: 20px;">
+                <div style="display: flex; align-items: center; gap: 5px; margin-right: 15px;">
                     <input type="checkbox" id="show-discrepancies" name="show-discrepancies">
                     <label for="show-discrepancies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: #c0392b;">Show Centroid Anomalies</label>
                 </div>
 
-                <div class="tab-13d" style="display: flex; align-items: center; gap: 15px;">
+                <div class="tab-13d" style="display: flex; align-items: center; gap: 8px;">
                     <div class="divider"></div>
-                    <div class="control-label">K-Means Source:</div>
+                    <div class="control-label" style="font-weight: bold;">K-Means Source:</div>
                     <div class="segmented-control">
                         <input type="radio" id="ks-pca" name="kmeansSource" value="pca" checked>
                         <label for="ks-pca">PCA</label>
@@ -92,12 +92,10 @@
                 <div class="plot-title">PCA Projection</div>
                 <div id="pca-plot" class="svg-container"></div>
             </div>
-            
             <div class="plot-container">
                 <div class="plot-title">Euclidean MDS Projection</div>
                 <div id="mds-plot" class="svg-container"></div>
             </div>
-
             <div class="plot-container">
                 <div class="plot-title">Data-Dependent Clusters (K-Means)</div>
                 <div id="kmeans-plot" class="svg-container"></div>
@@ -118,13 +116,15 @@
                 <div class="plot-title">Euclidean MDS Projection (2D)</div>
                 <div id="mds-plot-2d" class="svg-container"></div>
             </div>
+            <div class="plot-container" id="comparison-plot-container" style="grid-column: 1 / span 2;">
+                <div class="plot-title">Cluster Agreement Flow (PCA 2D vs MDS 2D)</div>
+                <div id="comparison-plot" class="svg-container"></div>
+            </div>
         </div>
 
         <div class="plot-container" id="panel-dynamic">
             <div class="plot-title" id="dynamic-panel-title">Live Analytics</div>
-            
-            <div class="svg-container" id="dynamic-svg-box" style="padding: 10px; width: 100%; height: 100%;">
-                
+            <div class="svg-container" id="dynamic-svg-box" style="padding: 10px; width: 100%; height: 100%; overflow-y: auto;">
                 <div id="empty-state-placeholder" class="dynamic-content-wrapper">
                     <div class="placeholder-content">
                         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -136,7 +136,6 @@
                         <span>Hover, click, or brush on the scatterplots to analyze local quality and relationships.</span>
                     </div>
                 </div>
-
                 <div id="gauges-container" class="dynamic-content-wrapper hidden-panel">
                     <div class="stat-card">
                         <h4>Selected Points</h4>
@@ -160,19 +159,16 @@
                         </div>
                     </div>
                 </div>
-
-                <div id="confusion-matrix-container" class="dynamic-content-wrapper hidden-panel" style="justify-content: center;">
-                    <h4 style="margin:0 0 10px 0; color: #2c3e50;">Abstract Labels vs Data-Dependent</h4>
+                <div id="confusion-matrix-container" class="dynamic-content-wrapper hidden-panel" style="justify-content: center; padding-top: 15px;">
+                    <h4 id="cm-main-title" style="margin:0 0 10px 0; color: #2c3e50;">Abstract Labels vs Data-Dependent</h4>
                     <div id="cm-table" style="width: 100%;"></div>
-                    <p style="font-size: 0.75rem; color: #7f8c8d; text-align: center; margin-top: 15px;">
+                    <p id="cm-desc" style="font-size: 0.75rem; color: #7f8c8d; text-align: center; margin-top: 15px;">
                         Analyzes discrepancies between Ground Truth (Abstract) and K-Means clusters (Data-inherent).
                     </p>
                 </div>
-
                 <div id="neighbor-graph-container" class="dynamic-content-wrapper hidden-panel">
                     <svg id="neighbor-graph-svg" style="width: 100%; height: 100%;"></svg>
                 </div>
-                
             </div>
         </div>
 
