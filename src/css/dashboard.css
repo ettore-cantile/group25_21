@@ -10,7 +10,7 @@ body {
     padding: 0;
     width: 100vw;
     height: 100vh;
-    overflow: hidden !important; /* Prevents any scrolling */
+    overflow: hidden !important;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #eaeff1;
     color: #333;
@@ -22,7 +22,6 @@ body {
 #app-grid {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    /* Fixed heights for top bars and footer to keep the screen exactly at 100vh */
     grid-template-rows: 45px 55px minmax(0, 1.3fr) minmax(0, 1fr) 40px;
     grid-template-areas:
         "header header"
@@ -36,7 +35,7 @@ body {
     padding-bottom: 10px;
 }
 
-/* 2D Tab Layout (Overrides grid areas) */
+/* 2D Tab Layout */
 #app-grid.mode-2d {
     grid-template-areas:
         "header header"
@@ -56,7 +55,7 @@ body {
     border-bottom: 1px solid #ddd;
     padding: 0 15px;
     display: flex;
-    justify-content: space-between; /* Restored original spacing */
+    justify-content: space-between;
     align-items: center;
     flex-wrap: nowrap;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
@@ -66,7 +65,6 @@ body {
 h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 .subtitle { margin: 0; font-size: 0.8rem; color: #7f8c8d; white-space: nowrap; }
 
-/* Main Tab Switcher Styles (Restored large size) */
 .main-tab-switcher {
     display: flex;
     background-color: #e9ecef;
@@ -80,8 +78,8 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 .main-tab-switcher label {
     flex: 1;
     text-align: center;
-    padding: 6px 18px; /* Restored elegant padding */
-    font-size: 0.95rem; /* Restored font size */
+    padding: 6px 18px;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #495057;
     border-radius: 4px;
@@ -111,21 +109,20 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
     z-index: 5;
     height: 100%; 
-    overflow: hidden; /* Prevents overflow from breaking the layout */
+    overflow: hidden;
 }
 
 .controls-left {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 15px; /* Restored original spacing */
+    gap: 15px;
     white-space: nowrap;
 }
 
 .control-label { color: #2c3e50; font-size: 0.9rem; }
 .divider { width: 1px; height: 30px; background-color: #ddd; margin: 0 4px; }
 
-/* Segmented Control Generic (Filters) */
 .segmented-control {
     display: flex;
     background-color: #e9ecef;
@@ -161,7 +158,7 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     display: flex;
     flex-direction: column;
     justify-content: center;
-    min-width: 250px; /* Restored original width so the legend is not squished */
+    min-width: 250px; 
     height: 100%; 
 }
 
@@ -185,7 +182,7 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 }
 
 .legend-cluster-dot {
-    width: 12px; /* Restored circular dot size */
+    width: 12px;
     height: 12px;
     border-radius: 50%;
     border: 1px solid #ccc;
@@ -200,8 +197,6 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     color: #555;
 }
 
-/* Very subtle media query just to prevent complete breakage on very small screens, 
-   but retaining the exact original proportions */
 @media (max-width: 1400px) {
     .controls-left { gap: 10px; }
     .control-label { font-size: 0.85rem; }
