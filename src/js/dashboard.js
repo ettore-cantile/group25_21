@@ -12,12 +12,14 @@ let minPrecision = 0;
 let minRecall = 0;
 
 // Scales Storage per Plot
-const scalesMap = { pca: {}, mds: {}, kmeans: {} };
+const scalesMap = { pca: {}, mds: {}, kmeans: {}, pca2d: {}, mds2d: {} };
 
 // D3 Brushes
 const brushPCA = d3.brush();
 const brushMDS = d3.brush();
 const brushKMeans = d3.brush();
+const brushPCA2D = d3.brush();
+const brushMDS2D = d3.brush();
 
 // --- SCALES ---
 const customTableau = [...d3.schemeTableau10];
@@ -85,6 +87,18 @@ Promise.all([
         if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);
     });
+    
+    // Temporaneamente mostriamo la tab 2D per permettere a drawPlot di misurare correttamente il DOM
+    d3.select("#app-grid").classed("mode-2d", true);
+    d3.selectAll(".tab-2d").classed("hidden-panel", false);
+    d3.selectAll(".tab-13d").classed("hidden-panel", true);
+    drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D);
+    drawPlot("#mds-plot-2d", "mds_x", "mds_y", "mds2d", brushMDS2D);
+    // Ripristiniamo la visualizzazione corretta (13D)
+    d3.select("#app-grid").classed("mode-2d", false);
+    d3.selectAll(".tab-2d").classed("hidden-panel", true);
+    d3.selectAll(".tab-13d").classed("hidden-panel", false);
+
     drawParallelCoordinates("#pc-plot");
     
     setupBrushing();
@@ -122,6 +136,20 @@ Promise.all([
 
     d3.select("#show-discrepancies").on("change", function() {
         toggleDiscrepancies(this.checked);
+    });
+
+    // --- TAB SWITCHER LOGIC ---
+    d3.selectAll("input[name='mainTab']").on("change", function() {
+        const selectedTab = this.value;
+        if (selectedTab === '13d') {
+            d3.select("#app-grid").classed("mode-2d", false);
+            d3.selectAll(".tab-13d").classed("hidden-panel", false);
+            d3.selectAll(".tab-2d").classed("hidden-panel", true);
+        } else {
+            d3.select("#app-grid").classed("mode-2d", true);
+            d3.selectAll(".tab-13d").classed("hidden-panel", true);
+            d3.selectAll(".tab-2d").classed("hidden-panel", false);
+        }
     });
 
     updateLegend();
@@ -218,10 +246,11 @@ function applyFilters() {
 
 // --- VISUALIZING ANOMALIES VIA CENTROIDS ---
 function toggleDiscrepancies(show) {
+    const plotMapping = { pca: '#pca-plot', mds: '#mds-plot', kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
     if (show) {
-        ['pca', 'mds', 'kmeans'].forEach(plotId => {
+        Object.keys(plotMapping).forEach(plotId => {
             const scales = scalesMap[plotId];
-            const svg = d3.select(`#${plotId}-plot svg g .centroid-layer`);
+            const svg = d3.select(`${plotMapping[plotId]} svg g .centroid-layer`);
             svg.selectAll("*").remove(); 
 
             const validKMeansClusters = Array.from(new Set(dataset.map(d => d.kmeans_cluster).filter(c => c !== undefined)));
@@ -280,7 +309,7 @@ function toggleDiscrepancies(show) {
 
         updateConfusionMatrix(dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall));
     } else {
-        ['pca', 'mds', 'kmeans'].forEach(plotId => d3.select(`#${plotId}-plot svg g .centroid-layer`).selectAll("*").remove());
+        Object.values(plotMapping).forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9).attr("stroke-width", 0.8);
         d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
@@ -340,6 +369,8 @@ function updateSelection(d) {
     d3.select("#pca-plot .brush-group").call(brushPCA.move, null);
     d3.select("#mds-plot .brush-group").call(brushMDS.move, null);
     d3.select("#kmeans-plot .brush-group").call(brushKMeans.move, null);
+    d3.select("#pca-plot-2d .brush-group").call(brushPCA2D.move, null);
+    d3.select("#mds-plot-2d .brush-group").call(brushMDS2D.move, null);
 
     d3.select("#dynamic-panel-title").text("Neighbor Graph");
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
@@ -369,13 +400,16 @@ function updateSelection(d) {
     drawLines("pca", d, neighborIds, "pca_x", "pca_y", brushPCA);
     drawLines("mds", d, neighborIds, "mds_x", "mds_y", brushMDS);
     drawLines("kmeans", d, neighborIds, "pca_x", "pca_y", brushKMeans); 
+    drawLines("pca2d", d, neighborIds, "pca_x", "pca_y", brushPCA2D);
+    drawLines("mds2d", d, neighborIds, "mds_x", "mds_y", brushMDS2D);
 
     const neighborsData = neighborIds.map(id => pointById.get(id)).filter(Boolean);
     drawNeighborGraph(d, neighborsData);
 }
 
 function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
-    const linkGroup = d3.select(`#${plotId}-plot .link-group`);
+    const plotMapping = { pca: '#pca-plot', mds: '#mds-plot', kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
+    const linkGroup = d3.select(`${plotMapping[plotId]} .link-group`);
     linkGroup.selectAll("line").remove(); 
 
     const sourceX = scalesMap[plotId].xScale(sourceD[xKey]);
@@ -397,15 +431,21 @@ function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
 
 // --- BI-DIRECTIONAL BRUSHING ---
 function setupBrushing() {
-    [brushPCA, brushMDS, brushKMeans].forEach(brush => {
-        brush.on("start brush end", function(event) {
+    const brushList = [
+        { obj: brushPCA, sel: "#pca-plot", id: "pca" },
+        { obj: brushMDS, sel: "#mds-plot", id: "mds" },
+        { obj: brushKMeans, sel: "#kmeans-plot", id: "kmeans" },
+        { obj: brushPCA2D, sel: "#pca-plot-2d", id: "pca2d" },
+        { obj: brushMDS2D, sel: "#mds-plot-2d", id: "mds2d" }
+    ];
+
+    brushList.forEach(({obj: brush, id: plotId}) => {
+        brush.on("start brush end", function (event) {
             if(event.sourceEvent && event.sourceEvent.type === "mousedown") {
-                [brushPCA, brushMDS, brushKMeans].filter(b => b !== brush).forEach(b => {
-                    const selector = b === brushPCA ? "#pca-plot" : b === brushMDS ? "#mds-plot" : "#kmeans-plot";
-                    d3.select(`${selector} .brush-group`).call(b.move, null);
+                brushList.filter(b => b.obj !== brush).forEach(b => {
+                    d3.select(`${b.sel} .brush-group`).call(b.obj.move, null);
                 });
             }
-            const plotId = brush === brushPCA ? "pca" : brush === brushMDS ? "mds" : "kmeans";
             handleBrush(event, brush, scalesMap[plotId].xKey, scalesMap[plotId].yKey);
         });
     });
@@ -523,8 +563,8 @@ function getColor(d) {
 }
 
 function updateColors() {
-    d3.selectAll(".dot.dot-pca").transition().duration(500).attr("fill", d => getColor(d));
-    d3.selectAll(".dot.dot-mds").transition().duration(500).attr("fill", d => getColor(d));
+    d3.selectAll(".dot.dot-pca, .dot.dot-pca2d").transition().duration(500).attr("fill", d => getColor(d));
+    d3.selectAll(".dot.dot-mds, .dot.dot-mds2d").transition().duration(500).attr("fill", d => getColor(d));
     d3.selectAll(".dot.dot-kmeans").transition().duration(500).attr("fill", d => {
         if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);

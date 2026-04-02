@@ -16,6 +16,12 @@
                 <h1>Dimensionality Reduction Quality</h1>
                 <p class="subtitle">Comparing PCA and Euclidean MDS via Relationship Metrics</p>
             </div>
+            <div class="segmented-control main-tab-switcher" style="font-size: 1rem;">
+                <input type="radio" id="tab-13d" name="mainTab" value="13d" checked>
+                <label for="tab-13d">MDS vs PCA 13D</label>
+                <input type="radio" id="tab-2d" name="mainTab" value="2d">
+                <label for="tab-2d">MDS vs PCA 2D</label>
+            </div>
         </header>
 
         <section class="top-controls">
@@ -70,7 +76,7 @@
             </div>
         </section>
 
-        <div id="plots-grid">
+        <div id="plots-grid" class="tab-content tab-13d">
             <div class="plot-container">
                 <div class="plot-title">PCA Projection</div>
                 <div id="pca-plot" class="svg-container"></div>
@@ -87,9 +93,28 @@
             </div>
         </div>
 
-        <div class="plot-container" id="pc-panel">
+        <div class="plot-container tab-content tab-13d" id="pc-panel">
             <div class="plot-title">Parallel Coordinates (Original Attributes)</div>
             <div id="pc-plot" class="svg-container"></div>
+        </div>
+
+        <div id="plots-grid-2d" class="tab-content tab-2d hidden-panel">
+            <div class="plot-container">
+                <div class="plot-title">PCA Projection (2D)</div>
+                <div id="pca-plot-2d" class="svg-container"></div>
+            </div>
+            <div class="plot-container">
+                <div class="plot-title">Euclidean MDS Projection (2D)</div>
+                <div id="mds-plot-2d" class="svg-container"></div>
+            </div>
+            <div class="plot-container">
+                <div class="plot-title">Placeholder 1</div>
+                <div id="placeholder1-plot-2d" class="svg-container"></div>
+            </div>
+            <div class="plot-container">
+                <div class="plot-title">Placeholder 2</div>
+                <div id="placeholder2-plot-2d" class="svg-container"></div>
+            </div>
         </div>
 
         <div class="plot-container" id="panel-dynamic">
