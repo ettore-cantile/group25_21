@@ -45,12 +45,18 @@ const gaugeAngleScale = d3.scaleLinear().domain([0, 1]).range([-Math.PI / 2, Mat
 Promise.all([
     d3.json("../json/step2_final_data.json?v=" + Date.now()),
     d3.csv("../../dataset/wine.csv"),
-    d3.json("../json/kmeans_results.json?v=" + Date.now())
-]).then(([data, wineData, kmeansData]) => {
+    d3.json("../json/kmeans_results.json?v=" + Date.now()),
+    d3.json("../json/kmeans_2d_results.json?v=" + Date.now())
+]).then(([data, wineData, kmeansData, kmeans2dData]) => {
     
     const kmeansMap = new Map();
     if(kmeansData && kmeansData.points) {
         kmeansData.points.forEach(p => kmeansMap.set(p.id, p));
+    }
+
+    const kmeans2dMap = new Map();
+    if(kmeans2dData && kmeans2dData.points) {
+        kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
     }
 
     data.points.forEach((p, i) => {
@@ -59,6 +65,13 @@ Promise.all([
         if(kData) {
             p.kmeans_cluster = kData.kmeans_cluster;
             p.is_anomaly = kData.is_anomaly; 
+        }
+        const k2dData = kmeans2dMap.get(p.id);
+        if(k2dData) {
+            p.pca_kmeans_cluster = k2dData.pca_kmeans_cluster;
+            p.pca_is_anomaly = k2dData.pca_is_anomaly;
+            p.mds_kmeans_cluster = k2dData.mds_kmeans_cluster;
+            p.mds_is_anomaly = k2dData.mds_is_anomaly;
         }
     });
 
@@ -92,8 +105,40 @@ Promise.all([
     d3.select("#app-grid").classed("mode-2d", true);
     d3.selectAll(".tab-2d").classed("hidden-panel", false);
     d3.selectAll(".tab-13d").classed("hidden-panel", true);
-    drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D);
-    drawPlot("#mds-plot-2d", "mds_x", "mds_y", "mds2d", brushMDS2D);
+    drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D, d => {
+        if (colorMode === 'original') return d.pca_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        return getColor(d);
+    });
+    drawPlot("#mds-plot-2d", "mds_x", "mds_y", "mds2d", brushMDS2D, d => {
+        if (colorMode === 'original') return d.mds_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        return getColor(d);
+    });
+
+    // Pulisce la griglia 2D dai placeholder e aggiunge il grafico di confronto
+    const grid2d = d3.select("#plots-grid-2d");
+
+    // Identifica i contenitori principali da non rimuovere
+    const pcaPlotContainer = d3.select("#pca-plot-2d").node()?.closest('.plot-container');
+    const mdsPlotContainer = d3.select("#mds-plot-2d").node()?.closest('.plot-container');
+
+    // Rimuove tutti i .plot-container che non sono i due principali
+    grid2d.selectAll(".plot-container").filter(function() {
+        return this !== pcaPlotContainer && this !== mdsPlotContainer;
+    }).remove();
+
+    // Aggiunge il contenitore per il grafico di confronto se non esiste già
+    if (grid2d.select("#comparison-plot-container").empty()) {
+        const newPlot = grid2d.append("div")
+            .attr("id", "comparison-plot-container")
+            .attr("class", "plot-container")
+            .style("grid-column", "1 / span 2"); // Occupa l'intera seconda riga
+
+        newPlot.append("div")
+            .attr("class", "plot-title")
+            .text("Comparison Plot"); // Titolo del nuovo grafico
+        newPlot.append("div").attr("id", "comparison-plot").attr("class", "svg-container"); // Contenitore per il grafico
+    }
+
     // Ripristiniamo la visualizzazione corretta (13D)
     d3.select("#app-grid").classed("mode-2d", false);
     d3.selectAll(".tab-2d").classed("hidden-panel", true);
@@ -253,15 +298,20 @@ function toggleDiscrepancies(show) {
             const svg = d3.select(`${plotMapping[plotId]} svg g .centroid-layer`);
             svg.selectAll("*").remove(); 
 
-            const validKMeansClusters = Array.from(new Set(dataset.map(d => d.kmeans_cluster).filter(c => c !== undefined)));
+            const isPCA2D = plotId === 'pca2d';
+            const isMDS2D = plotId === 'mds2d';
+            const clusterProp = isPCA2D ? 'pca_kmeans_cluster' : (isMDS2D ? 'mds_kmeans_cluster' : 'kmeans_cluster');
+            const anomalyProp = isPCA2D ? 'pca_is_anomaly' : (isMDS2D ? 'mds_is_anomaly' : 'is_anomaly');
+
+            const validKMeansClusters = Array.from(new Set(dataset.map(d => d[clusterProp]).filter(c => c !== undefined)));
             const centroids = {};
             validKMeansClusters.forEach(k => centroids[k] = {x:0, y:0, count:0});
 
             dataset.forEach(d => {
-                if(d.precision >= minPrecision && d.recall >= minRecall && d.kmeans_cluster !== undefined) {
-                    centroids[d.kmeans_cluster].x += scales.xScale(d[scales.xKey]);
-                    centroids[d.kmeans_cluster].y += scales.yScale(d[scales.yKey]);
-                    centroids[d.kmeans_cluster].count += 1;
+                if(d.precision >= minPrecision && d.recall >= minRecall && d[clusterProp] !== undefined) {
+                    centroids[d[clusterProp]].x += scales.xScale(d[scales.xKey]);
+                    centroids[d[clusterProp]].y += scales.yScale(d[scales.yKey]);
+                    centroids[d[clusterProp]].count += 1;
                 }
             });
 
@@ -273,18 +323,18 @@ function toggleDiscrepancies(show) {
             });
 
             dataset.forEach(d => {
-                if(d.precision < minPrecision || d.recall < minRecall || d.kmeans_cluster === undefined) return; 
-                if(centroids[d.kmeans_cluster].count === 0) return;
+                if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
+                if(centroids[d[clusterProp]].count === 0) return;
                 
-                const cx = centroids[d.kmeans_cluster].x;
-                const cy = centroids[d.kmeans_cluster].y;
+                const cx = centroids[d[clusterProp]].x;
+                const cy = centroids[d[clusterProp]].y;
                 const px = scales.xScale(d[scales.xKey]);
                 const py = scales.yScale(d[scales.yKey]);
                 
                 svg.append("line")
                     .attr("x1", px).attr("y1", py)
                     .attr("x2", cx).attr("y2", cy)
-                    .attr("class", d.is_anomaly ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct");
+                    .attr("class", d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct");
             });
 
             validKMeansClusters.forEach(k => {
@@ -299,9 +349,12 @@ function toggleDiscrepancies(show) {
             });
         });
 
-        d3.selectAll(".dot:not(.filtered-out)")
-            .style("opacity", d => d.is_anomaly ? 1.0 : 0.2)
-            .attr("stroke-width", d => d.is_anomaly ? 1.5 : 0);
+        d3.selectAll(".dot.dot-pca:not(.filtered-out), .dot.dot-mds:not(.filtered-out), .dot.dot-kmeans:not(.filtered-out)")
+            .style("opacity", d => d.is_anomaly ? 1.0 : 0.2).attr("stroke-width", d => d.is_anomaly ? 1.5 : 0);
+        d3.selectAll(".dot.dot-pca2d:not(.filtered-out)")
+            .style("opacity", d => d.pca_is_anomaly ? 1.0 : 0.2).attr("stroke-width", d => d.pca_is_anomaly ? 1.5 : 0);
+        d3.selectAll(".dot.dot-mds2d:not(.filtered-out)")
+            .style("opacity", d => d.mds_is_anomaly ? 1.0 : 0.2).attr("stroke-width", d => d.mds_is_anomaly ? 1.5 : 0);
 
         d3.selectAll(".pc-line:not(.filtered-out)")
             .style("opacity", d => d.is_anomaly ? 1.0 : 0.1)
@@ -563,8 +616,16 @@ function getColor(d) {
 }
 
 function updateColors() {
-    d3.selectAll(".dot.dot-pca, .dot.dot-pca2d").transition().duration(500).attr("fill", d => getColor(d));
-    d3.selectAll(".dot.dot-mds, .dot.dot-mds2d").transition().duration(500).attr("fill", d => getColor(d));
+    d3.selectAll(".dot.dot-pca").transition().duration(500).attr("fill", d => getColor(d));
+    d3.selectAll(".dot.dot-mds").transition().duration(500).attr("fill", d => getColor(d));
+    d3.selectAll(".dot.dot-pca2d").transition().duration(500).attr("fill", d => {
+        if (colorMode === 'original') return d.pca_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        return getColor(d);
+    });
+    d3.selectAll(".dot.dot-mds2d").transition().duration(500).attr("fill", d => {
+        if (colorMode === 'original') return d.mds_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        return getColor(d);
+    });
     d3.selectAll(".dot.dot-kmeans").transition().duration(500).attr("fill", d => {
         if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);
