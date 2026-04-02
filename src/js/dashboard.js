@@ -6,6 +6,7 @@ let uniqueClasses = [];
 let pointById = new Map();
 let currentPointSize = 5;
 let selectedPoint = null;
+let kmeansProjectionSource = 'pca'; // 'pca' or 'mds'
 
 // Filters
 let minPrecision = 0;
@@ -96,7 +97,7 @@ Promise.all([
 
     drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
     drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
-    drawPlot("#kmeans-plot", "pca_x", "pca_y", "kmeans", brushKMeans, d => {
+    drawPlot("#kmeans-plot", kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x', kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y', "kmeans", brushKMeans, d => {
         if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);
     });
@@ -114,19 +115,25 @@ Promise.all([
         return getColor(d);
     });
 
-    // Pulisce la griglia 2D dai placeholder e aggiunge il grafico di confronto
+    // Pulisce la griglia 2D dai placeholder e aggiunge il grafico di confronto (se non esiste)
     const grid2d = d3.select("#plots-grid-2d");
 
     // Identifica i contenitori principali da non rimuovere
     const pcaPlotContainer = d3.select("#pca-plot-2d").node()?.closest('.plot-container');
     const mdsPlotContainer = d3.select("#mds-plot-2d").node()?.closest('.plot-container');
 
-    // Rimuove tutti i .plot-container che non sono i due principali
+    // Rimuove tutti i .plot-container che non sono i due principali o il comparison plot
     grid2d.selectAll(".plot-container").filter(function() {
-        return this !== pcaPlotContainer && this !== mdsPlotContainer;
+        const isComparisonPlot = d3.select(this).attr("id") === "comparison-plot-container";
+        return this !== pcaPlotContainer && this !== mdsPlotContainer && !isComparisonPlot;
     }).remove();
 
     // Aggiunge il contenitore per il grafico di confronto se non esiste già
+    // Questo assicura che il comparison plot sia sempre presente e occupi la seconda riga
+    // dopo che eventuali placeholder sono stati rimossi.
+    // Lo aggiungiamo qui per assicurarci che sia sempre l'ultimo elemento nella griglia,
+    // e quindi occupi la seconda riga correttamente grazie a grid-column: 1 / span 2.
+    
     if (grid2d.select("#comparison-plot-container").empty()) {
         const newPlot = grid2d.append("div")
             .attr("id", "comparison-plot-container")
@@ -183,6 +190,12 @@ Promise.all([
         toggleDiscrepancies(this.checked);
     });
 
+    // K-Means source switcher
+    d3.selectAll("input[name='kmeansSource']").on("change", function() {
+        kmeansProjectionSource = this.value;
+        redrawKMeansPlot();
+    });
+
     // --- TAB SWITCHER LOGIC ---
     d3.selectAll("input[name='mainTab']").on("change", function() {
         const selectedTab = this.value;
@@ -199,6 +212,33 @@ Promise.all([
 
     updateLegend();
 }).catch(err => console.error("Error loading JSON/CSV:", err));
+
+
+// --- KMEANS REDRAW ---
+function redrawKMeansPlot() {
+    const xKey = kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x';
+    const yKey = kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y';
+
+    // Clear the old plot
+    d3.select("#kmeans-plot").html("");
+
+    // Redraw with new coordinates
+    drawPlot("#kmeans-plot", xKey, yKey, "kmeans", brushKMeans, d => {
+        if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        return getColor(d);
+    });
+
+    // Re-apply filters and discrepancies if they are active
+    applyFilters();
+    if (d3.select("#show-discrepancies").property("checked")) {
+        toggleDiscrepancies(true);
+    }
+
+    // Se c'era un punto selezionato, ripristina la selezione sul nuovo grafico K-Means
+    if (selectedPoint) {
+        updateSelection(selectedPoint);
+    }
+}
 
 
 // --- PLOTTING FUNCTION ---
@@ -450,9 +490,12 @@ function updateSelection(d) {
     d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id) && p.id !== d.id).raise();
     d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === d.id).raise();
 
+    const kmeansXKey = scalesMap['kmeans'].xKey;
+    const kmeansYKey = scalesMap['kmeans'].yKey;
+
     drawLines("pca", d, neighborIds, "pca_x", "pca_y", brushPCA);
     drawLines("mds", d, neighborIds, "mds_x", "mds_y", brushMDS);
-    drawLines("kmeans", d, neighborIds, "pca_x", "pca_y", brushKMeans); 
+    drawLines("kmeans", d, neighborIds, kmeansXKey, kmeansYKey, brushKMeans);
     drawLines("pca2d", d, neighborIds, "pca_x", "pca_y", brushPCA2D);
     drawLines("mds2d", d, neighborIds, "mds_x", "mds_y", brushMDS2D);
 

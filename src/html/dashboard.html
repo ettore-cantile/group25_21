@@ -65,6 +65,17 @@
                     <input type="checkbox" id="show-discrepancies" name="show-discrepancies">
                     <label for="show-discrepancies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: #c0392b;">Show Centroid Anomalies</label>
                 </div>
+
+                <div class="tab-13d" style="display: flex; align-items: center; gap: 15px;">
+                    <div class="divider"></div>
+                    <div class="control-label">K-Means Source:</div>
+                    <div class="segmented-control">
+                        <input type="radio" id="ks-pca" name="kmeansSource" value="pca" checked>
+                        <label for="ks-pca">PCA</label>
+                        <input type="radio" id="ks-mds" name="kmeansSource" value="mds">
+                        <label for="ks-mds">MDS</label>
+                    </div>
+                </div>
             </div>
             
             <div class="controls-right" id="legend-container">
@@ -106,14 +117,6 @@
             <div class="plot-container">
                 <div class="plot-title">Euclidean MDS Projection (2D)</div>
                 <div id="mds-plot-2d" class="svg-container"></div>
-            </div>
-            <div class="plot-container">
-                <div class="plot-title">Placeholder 1</div>
-                <div id="placeholder1-plot-2d" class="svg-container"></div>
-            </div>
-            <div class="plot-container">
-                <div class="plot-title">Placeholder 2</div>
-                <div id="placeholder2-plot-2d" class="svg-container"></div>
             </div>
         </div>
 
