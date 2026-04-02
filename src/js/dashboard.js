@@ -950,8 +950,11 @@ function drawParallelCoordinates(containerSelector) {
 
     const y = {};
     features.forEach(f => {
+        const extent = d3.extent(dataset, d => +d.attributes[f]);
+        const minVal = Math.min(0, extent[0]);
+        const maxVal = Math.max(0, extent[1]);
         y[f] = d3.scaleLinear()
-            .domain(d3.extent(dataset, d => +d.attributes[f]))
+            .domain([minVal, maxVal])
             .range([innerHeight, 0])
             .nice();
     });
