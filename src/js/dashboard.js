@@ -260,7 +260,8 @@ d3.select("#dataset-selector").on("change", function() {
 
 d3.select("#point-size-slider").on("input change", function() {
     currentPointSize = +this.value;
-    d3.selectAll(".dot").attr("r", currentPointSize);
+    // Calls updateColors to respect anomaly size logic instead of blindly resetting all
+    updateColors(); 
 });
 
 d3.select("#filter-prec").on("input change", function() {
@@ -279,7 +280,7 @@ d3.select("#show-discrepancies").on("change", function() {
     toggleDiscrepancies(this.checked);
 });
 
-// Ascoltatore per la nuova checkbox delle anomalie
+// Listener for anomalies checkbox
 d3.select("#show-anomalies").on("change", function() {
     updateColors();
 });
@@ -382,7 +383,12 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         .attr("class", d => `dot dot-${plotId} pt-${d.id}`)
         .attr("cx", d => xScale(d[xKey]))
         .attr("cy", d => yScale(d[yKey]))
-        .attr("r", currentPointSize)
+        // Apply larger size immediately if checkbox is active
+        .attr("r", d => {
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            let isAnom = (plotId === 'pca2d') ? d.pca_is_anomaly : ((plotId === 'mds2d') ? d.mds_is_anomaly : d.is_anomaly);
+            return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
+        })
         .attr("fill", d => customColorFn ? customColorFn(d) : getColor(d))
         .attr("stroke", "rgba(0,0,0,0.4)")
         .attr("stroke-width", 0.8)
@@ -391,7 +397,8 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         .on("mouseover", function(event, d) {
             resetAllHovers();
             d3.selectAll(`.dot.pt-${d.id}`)
-              .attr("r", currentPointSize * 1.6)
+              // Use 2.0 multiplier to ensure hover is visible above 1.8 anomaly size
+              .attr("r", currentPointSize * 2.0)
               .attr("stroke", "rgba(0,0,0,0.9)")
               .attr("stroke-width", 2).raise();
             d3.selectAll(`.pc-line.pt-${d.id}`)
@@ -587,7 +594,11 @@ function updateSelection(d) {
 
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.8 : 0.1))
-            .attr("r", p => p.id === d.id ? currentPointSize * 1.5 : currentPointSize)
+            .attr("r", function(p) {
+                if (p.id === d.id) return currentPointSize * 2.0; // Keep selected point large
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                return (showAnon && p.is_anomaly) ? currentPointSize * 1.8 : currentPointSize;
+            })
             .attr("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
         d3.selectAll(".pc-line:not(.filtered-out)")
@@ -618,7 +629,16 @@ function updateSelection(d) {
 
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : 0.1)
-            .attr("r", p => p.id === d.id ? currentPointSize * 1.5 : currentPointSize)
+            .attr("r", function(p) {
+                if (p.id === d.id) return currentPointSize * 2.0; // Keep selected point large
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                const plotClass = d3.select(this).attr("class");
+                let isAnom = false;
+                if (plotClass.includes("pca2d")) isAnom = p.pca_is_anomaly;
+                else if (plotClass.includes("mds2d")) isAnom = p.mds_is_anomaly;
+                else isAnom = p.is_anomaly;
+                return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
+            })
             .attr("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
         d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === d.id).raise();
@@ -886,16 +906,27 @@ function drawRadarChart(point) {
 
 // --- UTILITIES ---
 function resetAllHovers() {
+    const showAnon = d3.select("#show-anomalies").property("checked");
+    
+    // Helper function to calculate base radius matching anomaly status
+    const getBaseR = (nodeClass, d) => {
+        let isAnom = false;
+        if (nodeClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
+        else if (nodeClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
+        else isAnom = d.is_anomaly;
+        return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
+    };
+
     if (selectedPoint) {
         d3.selectAll(".dot")
-            .attr("r", p => p.id === selectedPoint.id ? currentPointSize * 1.5 : currentPointSize)
+            .attr("r", function(p) { return p.id === selectedPoint.id ? currentPointSize * 2.0 : getBaseR(d3.select(this).attr("class"), p); })
             .attr("stroke", p => p.id === selectedPoint.id ? "rgba(0,0,0,0.9)" : "rgba(0,0,0,0.4)")
             .attr("stroke-width", p => p.id === selectedPoint.id ? 2 : 0.8);
         d3.selectAll(".pc-line")
             .style("stroke-width", p => p.id === selectedPoint.id ? 3 : 1.5);
     } else {
         d3.selectAll(".dot")
-            .attr("r", currentPointSize)
+            .attr("r", function(p) { return getBaseR(d3.select(this).attr("class"), p); })
             .attr("stroke", "rgba(0,0,0,0.4)")
             .attr("stroke-width", 0.8);
         d3.selectAll(".pc-line")
@@ -944,23 +975,44 @@ function getColor(d) {
 
 function updateColors() {
     const showAnon = d3.select("#show-anomalies").property("checked");
-    d3.selectAll(".dot.dot-pca").transition().duration(500).attr("fill", d => getColor(d));
-    d3.selectAll(".dot.dot-mds").transition().duration(500).attr("fill", d => getColor(d));
     
-    d3.selectAll(".dot.dot-pca2d").transition().duration(500).attr("fill", d => {
-        if (colorMode === 'original') return (showAnon && d.pca_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
-        return getColor(d);
-    });
+    // Helper function to scale up anomalies
+    const getRadius = (isAnom) => (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
+
+    d3.selectAll(".dot.dot-pca").transition().duration(500)
+        .attr("fill", d => {
+            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
+        })
+        .attr("r", d => getRadius(d.is_anomaly));
+
+    d3.selectAll(".dot.dot-mds").transition().duration(500)
+        .attr("fill", d => {
+            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
+        })
+        .attr("r", d => getRadius(d.is_anomaly));
     
-    d3.selectAll(".dot.dot-mds2d").transition().duration(500).attr("fill", d => {
-        if (colorMode === 'original') return (showAnon && d.mds_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
-        return getColor(d);
-    });
+    d3.selectAll(".dot.dot-pca2d").transition().duration(500)
+        .attr("fill", d => {
+            if (colorMode === 'original') return (showAnon && d.pca_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
+        })
+        .attr("r", d => getRadius(d.pca_is_anomaly));
     
-    d3.selectAll(".dot.dot-kmeans").transition().duration(500).attr("fill", d => {
-        if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
-        return getColor(d);
-    });
+    d3.selectAll(".dot.dot-mds2d").transition().duration(500)
+        .attr("fill", d => {
+            if (colorMode === 'original') return (showAnon && d.mds_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
+        })
+        .attr("r", d => getRadius(d.mds_is_anomaly));
+    
+    d3.selectAll(".dot.dot-kmeans").transition().duration(500)
+        .attr("fill", d => {
+            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
+            return getColor(d);
+        })
+        .attr("r", d => getRadius(d.is_anomaly));
     
     d3.selectAll(".pc-line").transition().duration(500).style("stroke", d => {
         if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
@@ -1491,7 +1543,7 @@ function drawParallelCoordinates(containerSelector) {
         .on("mouseover", function(event, d) {
             resetAllHovers();
             d3.selectAll(`.dot.pt-${d.id}`)
-              .attr("r", currentPointSize * 1.6)
+              .attr("r", currentPointSize * 2.0)
               .attr("stroke", "rgba(0,0,0,0.9)")
               .attr("stroke-width", 2).raise();
             d3.selectAll(`.pc-line.pt-${d.id}`).style("stroke-width", 3).raise();
