@@ -87,7 +87,6 @@ function initDashboard(folder) {
     ]).then(([data, csvData, kmeansData, kmeans2dData]) => {
         
         // Extract Attribute Names Dynamically 
-        // Exclude specific columns including 'variety'
         if (csvData && csvData.length > 0) {
             const allKeys = Object.keys(csvData[0]);
             radarDimensions = allKeys.filter(k => !['producer', 'label', 'class', 'species', 'variety', 'unnamed', 'uns'].some(sub => k.toLowerCase().includes(sub)));
@@ -190,7 +189,8 @@ function initDashboard(folder) {
         drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
         drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
         drawPlot("#kmeans-plot", kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x', kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y', "kmeans", brushKMeans, d => {
-            if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
             return getColor(d);
         });
         drawParallelCoordinates("#pc-plot");
@@ -211,11 +211,13 @@ function initDashboard(folder) {
 
         // Draw 2D plots
         drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D, d => {
-            if (colorMode === 'original') return d.pca_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            if (colorMode === 'original') return (showAnon && d.pca_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
             return getColor(d);
         });
         drawPlot("#mds-plot-2d", "mds_x", "mds_y", "mds2d", brushMDS2D, d => {
-            if (colorMode === 'original') return d.mds_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            if (colorMode === 'original') return (showAnon && d.mds_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
             return getColor(d);
         });
         drawSankeyDiagram("#comparison-plot", dataset);
@@ -277,6 +279,11 @@ d3.select("#show-discrepancies").on("change", function() {
     toggleDiscrepancies(this.checked);
 });
 
+// Ascoltatore per la nuova checkbox delle anomalie
+d3.select("#show-anomalies").on("change", function() {
+    updateColors();
+});
+
 d3.selectAll("input[name='kmeansSource']").on("change", function() {
     kmeansProjectionSource = this.value;
     redrawKMeansPlot();
@@ -319,7 +326,8 @@ function redrawKMeansPlot() {
     d3.select("#kmeans-plot").html("");
 
     drawPlot("#kmeans-plot", xKey, yKey, "kmeans", brushKMeans, d => {
-        if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        const showAnon = d3.select("#show-anomalies").property("checked");
+        if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);
     });
 
@@ -330,8 +338,8 @@ function redrawKMeansPlot() {
 
 function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn = null) {
     const container = d3.select(containerSelector); 
-    const width = container.node().clientWidth;
-    const height = container.node().clientHeight;
+    const width = container.node().clientWidth || 400; // Fallback size
+    const height = container.node().clientHeight || 300;
     const margin = { top: 20, right: 25, bottom: 35, left: 35 };
 
     const svgRoot = container.append("svg")
@@ -350,8 +358,8 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
     });
 
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+    const innerWidth = Math.max(10, width - margin.left - margin.right);
+    const innerHeight = Math.max(10, height - margin.top - margin.bottom);
 
     const svg = svgRoot.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
@@ -495,7 +503,10 @@ function toggleDiscrepancies(show) {
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
         d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-        if (!selectedPoint && brushedPointsGlobal.length === 0) d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+        if (!selectedPoint && brushedPointsGlobal.length === 0) {
+            d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+            d3.select("#dynamic-panel-title").text("Live Analytics");
+        }
     }
 }
 
@@ -932,22 +943,27 @@ function getColor(d) {
 }
 
 function updateColors() {
+    const showAnon = d3.select("#show-anomalies").property("checked");
     d3.selectAll(".dot.dot-pca").transition().duration(500).attr("fill", d => getColor(d));
     d3.selectAll(".dot.dot-mds").transition().duration(500).attr("fill", d => getColor(d));
+    
     d3.selectAll(".dot.dot-pca2d").transition().duration(500).attr("fill", d => {
-        if (colorMode === 'original') return d.pca_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        if (colorMode === 'original') return (showAnon && d.pca_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);
     });
+    
     d3.selectAll(".dot.dot-mds2d").transition().duration(500).attr("fill", d => {
-        if (colorMode === 'original') return d.mds_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        if (colorMode === 'original') return (showAnon && d.mds_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);
     });
+    
     d3.selectAll(".dot.dot-kmeans").transition().duration(500).attr("fill", d => {
-        if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);
     });
+    
     d3.selectAll(".pc-line").transition().duration(500).style("stroke", d => {
-        if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+        if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
         return getColor(d);
     });
 }
@@ -969,10 +985,6 @@ function updateLegend() {
             item.append("div").attr("class", "legend-cluster-dot").style("background-color", colorOriginal(cls));
             item.append("span").text(cls); 
         });
-        
-        const anomalyItem = gradient.append("div").attr("class", "legend-cluster-item");
-        anomalyItem.append("div").attr("class", "legend-cluster-dot").style("background-color", "#e74c3c");
-        anomalyItem.append("span").text(`Anomaly`);
         
     } else {
         labelsDiv.style("display", "flex"); 
@@ -1315,7 +1327,7 @@ function drawSankeyDiagram(selector, activeData) {
     const sankey = d3.sankey()
         .nodeWidth(20)
         .nodePadding(15)
-        .extent([[0, 0], [width - margin.left - margin.right, height - margin.top - margin.bottom]]);
+        .extent([[0, 0], [Math.max(10, width - margin.left - margin.right), Math.max(10, height - margin.top - margin.bottom)]]);
 
     let graph;
     try {
@@ -1352,33 +1364,35 @@ function drawSankeyDiagram(selector, activeData) {
         .on("click", function(event, d) {
             event.stopPropagation();
             
-            // 1. Spunta la checkbox e genera tutti i centroidi
+            // 1. Activate "Show Centroids" checkbox and draw the centroid lines
             d3.select("#show-discrepancies").property("checked", true);
             toggleDiscrepancies(true);
             
+            // 2. Isolate relevant points
             const linkPointIds = new Set(d.points.map(p => p.id));
             
-            // 2. Isola i punti appartenenti a questo flusso
+            // Dim points that aren't in this flow
             d3.selectAll(".dot:not(.filtered-out)")
                 .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
                 .attr("r", p => linkPointIds.has(p.id) ? currentPointSize * 1.5 : currentPointSize);
                 
-            // 3. (Opzionale ma raccomandato) Isola anche le linee nel Parallel Coordinates
+            // Dim lines in Parallel Coordinates that aren't in this flow
             d3.selectAll(".pc-line:not(.filtered-out)")
                 .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
                 .style("stroke-width", p => linkPointIds.has(p.id) ? 2.5 : 1);
                 
-            // 4. Nascondi le linee dei centroidi che non fanno parte del flusso cliccato
+            // Hide centroid lines that don't belong to the clicked flow
             d3.selectAll(".centroid-link")
                 .style("display", function() {
                     const cls = d3.select(this).attr("class");
                     const idMatch = cls.match(/pt-(\d+)/);
                     if (idMatch && linkPointIds.has(+idMatch[1])) {
-                        return null; // Mostra
+                        return null; // Show
                     }
-                    return "none"; // Nascondi
+                    return "none"; // Hide
                 });
                 
+            // Bring highlighted elements to the front
             d3.selectAll(".dot:not(.filtered-out)").filter(p => linkPointIds.has(p.id)).raise();
         })
         .append("title")
@@ -1468,7 +1482,8 @@ function drawParallelCoordinates(containerSelector) {
         .attr("d", path)
         .style("fill", "none")
         .style("stroke", d => {
-            if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
             return getColor(d);
         })
         .style("stroke-width", 1.5)
