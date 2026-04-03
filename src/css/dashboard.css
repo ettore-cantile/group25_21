@@ -254,10 +254,10 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 #radar-legend div { white-space: nowrap; flex-shrink: 0; }
 
 /* Confusion Matrix Fixes */
-#confusion-matrix-container { padding-top: clamp(2px, 1vh, 10px) !important; justify-content: flex-start !important; }
+#confusion-matrix-container { padding-top: clamp(2px, 1vh, 10px) !important; justify-content: center !important; }
 #cm-main-title { font-size: clamp(0.65rem, 1vw, 0.9rem) !important; margin: 0 0 2px 0 !important; color: var(--text-title) !important; }
 #cm-desc { font-size: clamp(0.55rem, 0.8vw, 0.75rem) !important; margin: 0 0 5px 0 !important; color: var(--text-muted) !important; }
-#cm-table { width: 100%; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; }
+#cm-table { width: 100%; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;}
 #cm-table table { table-layout: fixed; width: 100%; } 
 #cm-table h5 { font-size: clamp(0.55rem, 0.9vw, 0.8rem) !important; margin: clamp(2px, 0.5vh, 5px) 0 !important; }
 #cm-table th, #cm-table td { font-size: clamp(0.45rem, 0.7vw, 0.75rem) !important; padding: clamp(1px, 0.3vh, 3px) !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
