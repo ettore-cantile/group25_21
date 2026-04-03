@@ -462,7 +462,7 @@ function toggleDiscrepancies(show) {
                 svgContainer.append("line")
                     .attr("x1", scales.xScale(d[scales.xKey])).attr("y1", scales.yScale(d[scales.yKey]))
                     .attr("x2", centroids[d[clusterProp]].x).attr("y2", centroids[d[clusterProp]].y)
-                    .attr("class", d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct");
+                    .attr("class", (d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct") + ` pt-${d.id}`);
             });
 
             validKMeansClusters.forEach(k => {
@@ -1351,10 +1351,34 @@ function drawSankeyDiagram(selector, activeData) {
         })
         .on("click", function(event, d) {
             event.stopPropagation();
+            
+            // 1. Spunta la checkbox e genera tutti i centroidi
+            d3.select("#show-discrepancies").property("checked", true);
+            toggleDiscrepancies(true);
+            
             const linkPointIds = new Set(d.points.map(p => p.id));
+            
+            // 2. Isola i punti appartenenti a questo flusso
             d3.selectAll(".dot:not(.filtered-out)")
                 .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
                 .attr("r", p => linkPointIds.has(p.id) ? currentPointSize * 1.5 : currentPointSize);
+                
+            // 3. (Opzionale ma raccomandato) Isola anche le linee nel Parallel Coordinates
+            d3.selectAll(".pc-line:not(.filtered-out)")
+                .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
+                .style("stroke-width", p => linkPointIds.has(p.id) ? 2.5 : 1);
+                
+            // 4. Nascondi le linee dei centroidi che non fanno parte del flusso cliccato
+            d3.selectAll(".centroid-link")
+                .style("display", function() {
+                    const cls = d3.select(this).attr("class");
+                    const idMatch = cls.match(/pt-(\d+)/);
+                    if (idMatch && linkPointIds.has(+idMatch[1])) {
+                        return null; // Mostra
+                    }
+                    return "none"; // Nascondi
+                });
+                
             d3.selectAll(".dot:not(.filtered-out)").filter(p => linkPointIds.has(p.id)).raise();
         })
         .append("title")
