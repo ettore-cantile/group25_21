@@ -383,10 +383,15 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         .attr("class", d => `dot dot-${plotId} pt-${d.id}`)
         .attr("cx", d => xScale(d[xKey]))
         .attr("cy", d => yScale(d[yKey]))
-        // Apply larger size immediately if checkbox is active
+        // Size scales ONLY on KMeans-related plots
         .attr("r", d => {
             const showAnon = d3.select("#show-anomalies").property("checked");
-            let isAnom = (plotId === 'pca2d') ? d.pca_is_anomaly : ((plotId === 'mds2d') ? d.mds_is_anomaly : d.is_anomaly);
+            let isAnom = false;
+            // Only consider it an anomaly (for visual changes) on the specific kmeans plots
+            if (plotId === 'pca2d') isAnom = d.pca_is_anomaly;
+            else if (plotId === 'mds2d') isAnom = d.mds_is_anomaly;
+            else if (plotId === 'kmeans') isAnom = d.is_anomaly;
+            
             return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
         })
         .attr("fill", d => customColorFn ? customColorFn(d) : getColor(d))
@@ -397,7 +402,6 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         .on("mouseover", function(event, d) {
             resetAllHovers();
             d3.selectAll(`.dot.pt-${d.id}`)
-              // Use 2.0 multiplier to ensure hover is visible above 1.8 anomaly size
               .attr("r", currentPointSize * 2.0)
               .attr("stroke", "rgba(0,0,0,0.9)")
               .attr("stroke-width", 2).raise();
@@ -436,15 +440,19 @@ function applyFilters() {
 }
 
 function toggleDiscrepancies(show) {
-    const plotMapping = { pca: '#pca-plot', mds: '#mds-plot', kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
+    // Only apply centroids to KMeans plots
+    const plotMapping = { kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
+    const allPlots = ['#pca-plot', '#mds-plot', '#kmeans-plot', '#pca-plot-2d', '#mds-plot-2d'];
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
 
     if (show) {
+        // Clear all centroid layers first to avoid phantom lines
+        allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove()); 
+
         Object.keys(plotMapping).forEach(plotId => {
             const scales = scalesMap[plotId];
             const svgContainer = d3.select(`${plotMapping[plotId]} svg g .centroid-layer`);
             if (svgContainer.empty()) return;
-            svgContainer.selectAll("*").remove(); 
 
             const isPCA2D = plotId === 'pca2d';
             const isMDS2D = plotId === 'mds2d';
@@ -491,22 +499,27 @@ function toggleDiscrepancies(show) {
             });
         });
 
-        d3.selectAll(".dot.dot-pca:not(.filtered-out), .dot.dot-mds:not(.filtered-out), .dot.dot-kmeans:not(.filtered-out)")
+        // Set opacity: Only dim non-anomalies on KMeans related plots. PCA/MDS stay opaque.
+        d3.selectAll(".dot.dot-pca:not(.filtered-out), .dot.dot-mds:not(.filtered-out)")
+            .style("opacity", 0.9);
+        d3.selectAll(".dot.dot-kmeans:not(.filtered-out)")
             .style("opacity", d => d.is_anomaly ? 1.0 : 0.2);
         d3.selectAll(".dot.dot-pca2d:not(.filtered-out)")
             .style("opacity", d => d.pca_is_anomaly ? 1.0 : 0.2);
         d3.selectAll(".dot.dot-mds2d:not(.filtered-out)")
             .style("opacity", d => d.mds_is_anomaly ? 1.0 : 0.2);
+            
+        // PC lines shouldn't fade based on anomaly anymore to isolate effects to kmeans plots
         d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("opacity", d => d.is_anomaly ? 1.0 : 0.1)
-            .style("stroke-width", d => d.is_anomaly ? 2.5 : 1);
+            .style("opacity", 0.6)
+            .style("stroke-width", 1.5);
 
         let activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
         
         if (!selectedPoint) updateConfusionMatrix(activePoints, currentTab);
         
     } else {
-        Object.values(plotMapping).forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
+        allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
         d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
@@ -597,7 +610,13 @@ function updateSelection(d) {
             .attr("r", function(p) {
                 if (p.id === d.id) return currentPointSize * 2.0; // Keep selected point large
                 const showAnon = d3.select("#show-anomalies").property("checked");
-                return (showAnon && p.is_anomaly) ? currentPointSize * 1.8 : currentPointSize;
+                const plotClass = d3.select(this).attr("class");
+                let isAnom = false;
+                // Highlight anomalies ONLY on kmeans-related plots
+                if (plotClass.includes("pca2d")) isAnom = p.pca_is_anomaly;
+                else if (plotClass.includes("mds2d")) isAnom = p.mds_is_anomaly;
+                else if (plotClass.includes("kmeans")) isAnom = p.is_anomaly;
+                return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
             })
             .attr("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
@@ -634,9 +653,10 @@ function updateSelection(d) {
                 const showAnon = d3.select("#show-anomalies").property("checked");
                 const plotClass = d3.select(this).attr("class");
                 let isAnom = false;
+                // Highlight anomalies ONLY on kmeans-related plots
                 if (plotClass.includes("pca2d")) isAnom = p.pca_is_anomaly;
                 else if (plotClass.includes("mds2d")) isAnom = p.mds_is_anomaly;
-                else isAnom = p.is_anomaly;
+                else if (plotClass.includes("kmeans")) isAnom = p.is_anomaly;
                 return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
             })
             .attr("stroke-width", p => p.id === d.id ? 2 : 0.8);
@@ -911,9 +931,11 @@ function resetAllHovers() {
     // Helper function to calculate base radius matching anomaly status
     const getBaseR = (nodeClass, d) => {
         let isAnom = false;
+        // Anomalies are sized up ONLY on kmeans-related plots
         if (nodeClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
         else if (nodeClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
-        else isAnom = d.is_anomaly;
+        else if (nodeClass.includes("kmeans")) isAnom = d.is_anomaly;
+        
         return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
     };
 
@@ -979,20 +1001,16 @@ function updateColors() {
     // Helper function to scale up anomalies
     const getRadius = (isAnom) => (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
 
+    // PCA and MDS plots in Tab 1 DO NOT show anomalies
     d3.selectAll(".dot.dot-pca").transition().duration(500)
-        .attr("fill", d => {
-            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
-            return getColor(d);
-        })
-        .attr("r", d => getRadius(d.is_anomaly));
+        .attr("fill", d => getColor(d))
+        .attr("r", currentPointSize);
 
     d3.selectAll(".dot.dot-mds").transition().duration(500)
-        .attr("fill", d => {
-            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
-            return getColor(d);
-        })
-        .attr("r", d => getRadius(d.is_anomaly));
+        .attr("fill", d => getColor(d))
+        .attr("r", currentPointSize);
     
+    // 2D PCA K-Means plot shows anomalies
     d3.selectAll(".dot.dot-pca2d").transition().duration(500)
         .attr("fill", d => {
             if (colorMode === 'original') return (showAnon && d.pca_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
@@ -1000,6 +1018,7 @@ function updateColors() {
         })
         .attr("r", d => getRadius(d.pca_is_anomaly));
     
+    // 2D MDS K-Means plot shows anomalies
     d3.selectAll(".dot.dot-mds2d").transition().duration(500)
         .attr("fill", d => {
             if (colorMode === 'original') return (showAnon && d.mds_is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
@@ -1007,6 +1026,7 @@ function updateColors() {
         })
         .attr("r", d => getRadius(d.mds_is_anomaly));
     
+    // 13D K-Means plot shows anomalies
     d3.selectAll(".dot.dot-kmeans").transition().duration(500)
         .attr("fill", d => {
             if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
@@ -1014,10 +1034,9 @@ function updateColors() {
         })
         .attr("r", d => getRadius(d.is_anomaly));
     
-    d3.selectAll(".pc-line").transition().duration(500).style("stroke", d => {
-        if (colorMode === 'original') return (showAnon && d.is_anomaly) ? '#e74c3c' : colorOriginal(d.label);
-        return getColor(d);
-    });
+    // PC Lines DO NOT show anomalies color overrides
+    d3.selectAll(".pc-line").transition().duration(500)
+        .style("stroke", d => getColor(d));
 }
 
 function updateLegend() {
