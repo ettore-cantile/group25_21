@@ -752,16 +752,21 @@ function drawRadarChart(point) {
     const container = d3.select("#radar-chart-svg-container");
     container.html(""); 
 
-    const width = container.node().clientWidth || 300;
-    const height = container.node().clientHeight || 250;
+    // 1. Definiamo una tela fissa e quadrata (es. 500x500)
+    const baseSize = 500;
     const margin = 90; 
-    const radius = Math.min(width / 2, height / 2) - margin;
+    const radius = (baseSize / 2) - margin;
 
+    // 2. Sfruttiamo viewBox e xMidYMid meet per dire al browser di centrare 
+    // l'SVG nel suo div genitore a qualsiasi risoluzione, mantenendo le proporzioni.
     const svg = container.append("svg")
-        .attr("width", width)
-        .attr("height", height)
+        .attr("viewBox", `0 0 ${baseSize} ${baseSize}`)
+        .attr("preserveAspectRatio", "xMidYMid meet")
+        .style("width", "100%")
+        .style("height", "100%")
+        .style("display", "block") // Previene margini indesiderati sotto l'SVG
         .append("g")
-        .attr("transform", `translate(${width / 2},${height / 2})`);
+        .attr("transform", `translate(${baseSize / 2},${baseSize / 2})`);
 
     const normalize = (dim, value) => {
         const {min, max} = radarMinMax[dim];
@@ -806,7 +811,7 @@ function drawRadarChart(point) {
     const textNodes = axes.append("text")
         .attr("x", (d, i) => -(radius + 20) * Math.cos((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length)))
         .attr("y", (d, i) => -(radius + 20) * Math.sin((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length)))
-        .text(d => truncateText(d.replace(/_/g, ' '), 12)) // <-- Applica il limite (puoi cambiare 12 con il numero che preferisci)
+        .text(d => truncateText(d.replace(/_/g, ' '), 12)) 
         .style("text-anchor", (d, i) => {
             const calcX = -Math.cos((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length));
             if (calcX > 0.1) return "start"; 
@@ -818,7 +823,6 @@ function drawRadarChart(point) {
         .style("fill", "#2c3e50")
         .style("font-weight", "bold");
 
-    // 3. Aggiungiamo un title in modo che se l'utente passa il mouse sulla scritta coi puntini, veda il nome completo
     textNodes.append("title")
         .text(d => d.replace(/_/g, ' '));
 
@@ -1255,7 +1259,7 @@ function drawSankeyDiagram(selector, activeData) {
     const legendHtml = container.append("div")
         .attr("class", "sankey-legend-html")
         .style("position", "absolute")
-        .style("bottom", "5px") // Abbassata al limite per non coprire i nodi
+        .style("bottom", "7px") // Abbassata al limite per non coprire i nodi
         .style("left", "50%")
         .style("transform", "translateX(-50%)")
         .style("display", "flex")

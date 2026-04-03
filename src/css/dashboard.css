@@ -166,7 +166,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: #2c3e50; white
     flex: 0 1 auto; 
     padding-left: clamp(5px, 1vw, 10px);
     /* Stringe la tolleranza per farlo rimanere sempre a destra fino allo sfinimento */
-    min-width: 150px; 
+    min-width: 200px; 
 }
 
 #legend-gradient {
