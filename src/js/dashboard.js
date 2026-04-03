@@ -131,8 +131,6 @@ function initDashboard(folder) {
         uniqueClasses = Array.from(new Set(dataset.map(d => String(d.label)))).sort();
         pointById = new Map(dataset.map(p => [p.id, p]));
 
-        colorOriginal.domain(uniqueClasses);
-
         // Reset domain mapping so colors always start cleanly from the beginning
         colorOriginal.domain(uniqueClasses);
         colorKMeans.domain(uniqueClasses);
@@ -178,18 +176,40 @@ function initDashboard(folder) {
             d3.select("#fb-global-fscore").text(gFScore !== undefined ? (gFScore * 100).toFixed(1) + "%" : "N/A");
         }
 
-        // Draw Scatters
+        // =========================================================================
+        // CRITICAL FIX: Force synchronous layout for both tabs to get correct sizes
+        // =========================================================================
+
+        // 1. Activate 13D layout temporarily
+        d3.select("#app-grid").classed("mode-2d", false);
+        d3.selectAll(".tab-13d").classed("hidden-panel", false);
+        d3.selectAll(".tab-2d").classed("hidden-panel", true);
+        document.body.clientWidth; // Force layout reflow
+
+        // Draw 13D plots
         drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
         drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
         drawPlot("#kmeans-plot", kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x', kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y', "kmeans", brushKMeans, d => {
             if (colorMode === 'original') return d.is_anomaly ? '#e74c3c' : colorOriginal(d.label);
             return getColor(d);
         });
-        
+        drawParallelCoordinates("#pc-plot");
+
+        // 2. Activate 2D layout temporarily
         d3.select("#app-grid").classed("mode-2d", true);
-        d3.selectAll(".tab-2d").classed("hidden-panel", false);
         d3.selectAll(".tab-13d").classed("hidden-panel", true);
-        
+        d3.selectAll(".tab-2d").classed("hidden-panel", false);
+        document.body.clientWidth; // Force layout reflow
+
+        // Ensure container exists
+        const grid2d = d3.select("#plots-grid-2d");
+        if (grid2d.select("#comparison-plot-container").empty()) {
+            const newPlot = grid2d.append("div").attr("id", "comparison-plot-container").attr("class", "plot-container").style("grid-column", "1 / span 2");
+            newPlot.append("div").attr("class", "plot-title").text("Cluster Agreement Flow"); 
+            newPlot.append("div").attr("id", "comparison-plot").attr("class", "svg-container"); 
+        }
+
+        // Draw 2D plots
         drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D, d => {
             if (colorMode === 'original') return d.pca_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
             return getColor(d);
@@ -198,23 +218,16 @@ function initDashboard(folder) {
             if (colorMode === 'original') return d.mds_is_anomaly ? '#e74c3c' : colorOriginal(d.label);
             return getColor(d);
         });
+        drawSankeyDiagram("#comparison-plot", dataset);
 
-        const grid2d = d3.select("#plots-grid-2d");
-        if (grid2d.select("#comparison-plot-container").empty()) {
-            const newPlot = grid2d.append("div").attr("id", "comparison-plot-container").attr("class", "plot-container").style("grid-column", "1 / span 2");
-            newPlot.append("div").attr("class", "plot-title").text("Cluster Agreement Flow"); 
-            newPlot.append("div").attr("id", "comparison-plot").attr("class", "svg-container"); 
-        }
-
+        // 3. Restore layout to the actually active tab
         const is13D = d3.select("input[name='mainTab']:checked").node().value === '13d';
         d3.select("#app-grid").classed("mode-2d", !is13D);
-        d3.selectAll(".tab-2d").classed("hidden-panel", is13D);
         d3.selectAll(".tab-13d").classed("hidden-panel", !is13D);
+        d3.selectAll(".tab-2d").classed("hidden-panel", is13D);
+        document.body.clientWidth; // Force layout reflow one last time
+        // =========================================================================
 
-        // Draw Complex Components
-        drawParallelCoordinates("#pc-plot");
-        drawSankeyDiagram("#comparison-plot", dataset);
-        
         // Re-attach UI Logic
         setupBrushing();
         updateLegend();
@@ -482,10 +495,7 @@ function toggleDiscrepancies(show) {
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
         d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-        if (!selectedPoint && brushedPointsGlobal.length === 0) {
-            d3.select("#empty-state-placeholder").classed("hidden-panel", false);
-            d3.select("#dynamic-panel-title").text("Live Analytics");
-        }
+        if (!selectedPoint && brushedPointsGlobal.length === 0) d3.select("#empty-state-placeholder").classed("hidden-panel", false);
     }
 }
 
@@ -841,7 +851,7 @@ function drawRadarChart(point) {
             .datum(getCoordinates(kmeansData))
             .attr("d", lineBuilder)
             .style("fill", "none")
-            .style("stroke", "#8e44ad")
+            .style("stroke", "#228B22")
             .style("stroke-width", "2px");
     }
 
@@ -1382,12 +1392,12 @@ function drawParallelCoordinates(containerSelector) {
     if (container.empty()) return;
     container.html("");
 
-    const width = container.node().clientWidth;
-    const height = container.node().clientHeight;
+    const width = container.node().clientWidth || 400; // Fallback to avoid error
+    const height = container.node().clientHeight || 300;
     const margin = { top: 30, right: 30, bottom: 20, left: 30 };
     
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+    const innerWidth = Math.max(10, width - margin.left - margin.right);
+    const innerHeight = Math.max(10, height - margin.top - margin.bottom);
 
     const svgRoot = container.append("svg")
         .attr("viewBox", `0 0 ${width} ${height}`)
