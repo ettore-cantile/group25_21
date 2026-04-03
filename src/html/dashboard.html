@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,11 +17,31 @@
                 <h1>Dimensionality Reduction Quality</h1>
                 <p class="subtitle">Comparing PCA and Euclidean MDS via Relationship Metrics</p>
             </div>
-            <div class="segmented-control main-tab-switcher">
-                <input type="radio" id="tab-13d" name="mainTab" value="13d" checked>
-                <label for="tab-13d">MDS vs PCA 13D</label>
-                <input type="radio" id="tab-2d" name="mainTab" value="2d">
-                <label for="tab-2d">MDS vs PCA 2D</label>
+            
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="theme-toggle" class="theme-toggle" aria-label="Toggle Theme">
+                    <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+
+                <div class="segmented-control main-tab-switcher">
+                    <input type="radio" id="tab-13d" name="mainTab" value="13d" checked>
+                    <label for="tab-13d">MDS vs PCA 13D</label>
+                    <input type="radio" id="tab-2d" name="mainTab" value="2d">
+                    <label for="tab-2d">MDS vs PCA 2D</label>
+                </div>
             </div>
         </header>
 
@@ -44,14 +64,14 @@
 
                 <div style="display: flex; flex-direction: column; gap: 4px; min-width: 160px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 5px;">
-                        <label for="filter-prec" style="font-size: 0.8rem; font-weight: bold; color: #34495e; margin:0;">Min Prec:</label>
+                        <label for="filter-prec" style="font-size: 0.8rem; font-weight: bold; color: var(--text-title); margin:0;">Min Prec:</label>
                         <input type="range" id="filter-prec" min="0" max="1" step="0.05" value="0" style="width: 70px; margin:0; padding:0;">
-                        <span id="val-min-prec" style="font-size: 0.8rem; font-weight: bold; width: 25px; text-align:right;">0.00</span>
+                        <span id="val-min-prec" style="font-size: 0.8rem; font-weight: bold; width: 25px; text-align:right; color: var(--text-title);">0.00</span>
                     </div>
                     <div style="display: flex; align-items: center; justify-content: space-between; gap: 5px;">
-                        <label for="filter-rec" style="font-size: 0.8rem; font-weight: bold; color: #34495e; margin:0;">Min Rec:</label>
+                        <label for="filter-rec" style="font-size: 0.8rem; font-weight: bold; color: var(--text-title); margin:0;">Min Rec:</label>
                         <input type="range" id="filter-rec" min="0" max="1" step="0.05" value="0" style="width: 70px; margin:0; padding:0;">
-                        <span id="val-min-rec" style="font-size: 0.8rem; font-weight: bold; width: 25px; text-align:right;">0.00</span>
+                        <span id="val-min-rec" style="font-size: 0.8rem; font-weight: bold; width: 25px; text-align:right; color: var(--text-title);">0.00</span>
                     </div>
                 </div>
 
@@ -59,10 +79,10 @@
 
                 <div style="display: flex; align-items: center; gap: 5px; margin-right: 15px;">
                     <input type="checkbox" id="show-anomalies" name="show-anomalies">
-                    <label for="show-anomalies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: #c0392b;">Show Anomalies</label>
+                    <label for="show-anomalies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color);">Show Anomalies</label>
                     
                     <input type="checkbox" id="show-discrepancies" name="show-discrepancies" style="margin-left: 10px;">
-                    <label for="show-discrepancies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: #c0392b;">Show Centroids</label>
+                    <label for="show-discrepancies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color);">Show Centroids</label>
                 </div>
 
                 <div class="tab-13d" style="display: flex; align-items: center; gap: 8px;">
@@ -127,7 +147,7 @@
                 
                 <div id="empty-state-placeholder" class="dynamic-content-wrapper">
                     <div class="placeholder-content">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#bdc3c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
                             <line x1="12" y1="8" x2="12" y2="12"></line>
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -139,7 +159,7 @@
 
                 <div id="radar-empty-state" class="dynamic-content-wrapper hidden-panel">
                     <div class="placeholder-content">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3498db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
@@ -172,12 +192,12 @@
                     </div>
                 </div>
 
-                <div id="confusion-matrix-container" class="dynamic-content-wrapper hidden-panel" style="justify-content: flex-start; padding-top: 15px;">
-                    <h4 id="cm-main-title" style="margin:0 0 5px 0; color: #2c3e50;">Abstract Labels vs Data-Dependent</h4>
-                    <p id="cm-desc" style="font-size: 0.75rem; color: #7f8c8d; text-align: center; margin: 0 0 10px 0;">
+                <div id="confusion-matrix-container" class="dynamic-content-wrapper hidden-panel">
+                    <h4 id="cm-main-title">Abstract Labels vs Data-Dependent</h4>
+                    <p id="cm-desc">
                         Analyzes discrepancies between Ground Truth and K-Means clusters.
                     </p>
-                    <div id="cm-table" style="width: 100%;"></div>
+                    <div id="cm-table"></div>
                 </div>
 
                 <div id="neighbor-graph-container" class="dynamic-content-wrapper hidden-panel">
@@ -185,10 +205,10 @@
                 </div>
 
                 <div id="radar-chart-container" class="dynamic-content-wrapper hidden-panel" style="justify-content: flex-start;">
-                    <div id="radar-legend" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 5px; font-size: 0.75rem; font-weight: bold;">
-                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:#e74c3c;"></span> Selected Point</div>
-                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:#2980b9;"></span> Original Cluster Avg</div>
-                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:#228B22;"></span> PCA K-Means Avg</div>
+                    <div id="radar-legend">
+                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:var(--radar-point);"></span> Selected Point</div>
+                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:var(--radar-orig);"></span> Original Cluster Avg</div>
+                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:var(--radar-kmeans);"></span> PCA K-Means Avg</div>
                     </div>
                     <div id="radar-chart-svg-container" style="flex: 1; width: 100%; position: relative;"></div>
                 </div>
