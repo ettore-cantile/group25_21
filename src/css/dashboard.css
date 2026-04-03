@@ -10,7 +10,7 @@ body {
     padding: 0;
     width: 100vw;
     height: 100vh;
-    overflow: hidden !important; /* Forza l'assenza assoluta di scroll globale */
+    overflow: hidden !important; 
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #eaeff1;
     color: #333;
@@ -95,7 +95,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: #2c3e50; white
 }
 
 /* =========================================
-   TOP CONTROLS & FILTERS (Layout a Riga Singola)
+   TOP CONTROLS & FILTERS 
    ========================================= */
 .top-controls {
     grid-area: controls;
@@ -103,14 +103,12 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: #2c3e50; white
     padding: clamp(6px, 1vh, 12px) clamp(10px, 1.5vw, 20px);
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap; /* Permette alla legenda di andare sotto solo in caso di zoom estremo */
+    flex-wrap: wrap; 
     align-items: center;
     justify-content: space-between;
     gap: 10px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
     z-index: 5;
-    
-    /* Protezione contro lo zoom: blocca l'altezza e permette lo scroll solo qui dentro */
     max-height: clamp(60px, 16vh, 120px); 
     overflow-y: auto; 
     overflow-x: hidden;
@@ -165,7 +163,6 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: #2c3e50; white
     justify-content: center;
     flex: 0 1 auto; 
     padding-left: clamp(5px, 1vw, 10px);
-    /* Stringe la tolleranza per farlo rimanere sempre a destra fino allo sfinimento */
     min-width: 200px; 
 }
 
@@ -187,7 +184,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: #2c3e50; white
     gap: clamp(3px, 0.5vw, 6px);
     font-size: clamp(0.55rem, 0.85vw, 0.8rem);
     font-weight: bold;
-    flex-shrink: 0; /* Impedisce che il nome si stringa scomparendo */
+    flex-shrink: 0; 
 }
 
 .legend-cluster-item span {
@@ -367,7 +364,7 @@ svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
 /* Radar Chart JS override */
 #radar-legend {
-    flex-wrap: wrap !important; /* PERMETTI di andare a capo pulito se non c'è spazio */
+    flex-wrap: wrap !important;
     gap: clamp(6px, 1vw, 15px) !important;
     font-size: clamp(0.55rem, 0.8vw, 0.75rem) !important;
     margin-bottom: clamp(5px, 1vh, 10px) !important;
@@ -375,8 +372,8 @@ svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     justify-content: center;
 }
 #radar-legend div { 
-    white-space: nowrap; /* IMPEDISCE alle singole parole (es. "Selected Point") di spezzarsi a metà */
-    flex-shrink: 0;      /* IMPEDISCE al flexbox di schiacciare il div nascondendo le lettere */
+    white-space: nowrap; 
+    flex-shrink: 0;      
 }
 
 /* Confusion Matrix Fixes */

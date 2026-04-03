@@ -752,19 +752,16 @@ function drawRadarChart(point) {
     const container = d3.select("#radar-chart-svg-container");
     container.html(""); 
 
-    // 1. Definiamo una tela fissa e quadrata (es. 500x500)
     const baseSize = 500;
     const margin = 90; 
     const radius = (baseSize / 2) - margin;
 
-    // 2. Sfruttiamo viewBox e xMidYMid meet per dire al browser di centrare 
-    // l'SVG nel suo div genitore a qualsiasi risoluzione, mantenendo le proporzioni.
     const svg = container.append("svg")
         .attr("viewBox", `0 0 ${baseSize} ${baseSize}`)
         .attr("preserveAspectRatio", "xMidYMid meet")
         .style("width", "100%")
         .style("height", "100%")
-        .style("display", "block") // Previene margini indesiderati sotto l'SVG
+        .style("display", "block") 
         .append("g")
         .attr("transform", `translate(${baseSize / 2},${baseSize / 2})`);
 
@@ -1086,13 +1083,10 @@ function drawNeighborGraph(centerNode, neighborNodes) {
     const svg = d3.select("#neighbor-graph-svg");
     svg.selectAll("*").remove();
 
-    // Impostiamo un sistema di coordinate fisso (300x300). 
-    // viewBox e preserveAspectRatio faranno sì che sia sempre centrato e scalato correttamente nel div padre.
     const baseSize = 300;
     svg.attr("viewBox", `0 0 ${baseSize} ${baseSize}`)
        .attr("preserveAspectRatio", "xMidYMid meet");
     
-    // Rimuoviamo i translate() manuali
     const g = svg.append("g");
 
     const centerRadius = 15; 
@@ -1153,7 +1147,6 @@ function drag(simulation, centerNode, size) {
         d.fy = d.y;
     }
     function dragged(event, d) {
-        // Limita il trascinamento all'interno del viewBox 300x300
         d.fx = Math.max(15, Math.min(size - 15, event.x));
         d.fy = Math.max(15, Math.min(size - 15, event.y));
     }
@@ -1184,7 +1177,7 @@ function drawSankeyDiagram(selector, activeData) {
 
     const width = container.node().clientWidth;
     const height = container.node().clientHeight;
-    // Lasciamo un po' più di margine in basso per la legenda fluttuante
+    
     const margin = { top: 15, right: 40, bottom: 50, left: 40 };
 
     const svg = container.append("svg")
@@ -1239,15 +1232,12 @@ function drawSankeyDiagram(selector, activeData) {
 
     const links = Array.from(linkMap.values());
 
-    // --- NUOVA LOGICA: Scala Discreta (Threshold) e calcolo Bucket ---
     const maxDiscrepancy = d3.max(links.filter(l => l.isDiscrepancy), d => d.value) || 1;
     
-    // Scegliamo fino a 5 colori in base a quanti errori ci sono al massimo
     const baseColors = ["#fcae91", "#fb6a4a", "#ef3b2c", "#cb181d", "#99000d"];
     const numColors = Math.min(maxDiscrepancy, 5);
     const severityColors = baseColors.slice(0, numColors);
     
-    // Calcolo dinamico degli step interi (es. se max è 10 e abbiamo 5 colori, lo step è 2)
     const step = Math.max(1, Math.ceil(maxDiscrepancy / numColors));
     const thresholds = severityColors.map((_, i) => (i + 1) * step + 1).slice(0, -1);
     
@@ -1255,11 +1245,10 @@ function drawSankeyDiagram(selector, activeData) {
         .domain(thresholds)
         .range(severityColors);
 
-    // --- Disegno Legenda in HTML Fluttuante ---
     const legendHtml = container.append("div")
         .attr("class", "sankey-legend-html")
         .style("position", "absolute")
-        .style("bottom", "7px") // Abbassata al limite per non coprire i nodi
+        .style("bottom", "7px") 
         .style("left", "50%")
         .style("transform", "translateX(-50%)")
         .style("display", "flex")
@@ -1267,19 +1256,19 @@ function drawSankeyDiagram(selector, activeData) {
         .style("align-items", "center")
         .style("z-index", "10")
         .style("width", "150px")
-        .style("pointer-events", "none"); // Trasparente ai click
+        .style("pointer-events", "none"); 
 
     legendHtml.append("div")
         .style("font-size", "0.6rem")
         .style("font-weight", "bold")
-        .style("color", "#2c3e50") // Grigio più leggero
+        .style("color", "#2c3e50") 
         .style("margin-bottom", "3px")
         .text("Discrepancy Severity");
 
     const colorStrip = legendHtml.append("div")
         .style("display", "flex")
         .style("width", "100%")
-        .style("height", "8px") // Ancora più sottile
+        .style("height", "8px") 
         .style("border-radius", "2px")
         .style("overflow", "hidden");
 
@@ -1313,7 +1302,6 @@ function drawSankeyDiagram(selector, activeData) {
             .text(label);
     });
 
-    // --- Disegno Sankey ---
     const sankey = d3.sankey()
         .nodeWidth(20)
         .nodePadding(15)
@@ -1330,7 +1318,6 @@ function drawSankeyDiagram(selector, activeData) {
         return;
     }
 
-    // Ordina i link per disegnare prima le concordanze e sopra le discrepanze (evita sovrapposizioni visive)
     graph.links.sort((a, b) => (a.isDiscrepancy === b.isDiscrepancy ? 0 : a.isDiscrepancy ? 1 : -1));
 
     const linkGroup = svg.append("g")
@@ -1339,7 +1326,6 @@ function drawSankeyDiagram(selector, activeData) {
         .data(graph.links)
         .enter().append("g");
 
-    // Disegno delle linee (Path)
     linkGroup.append("path")
         .attr("d", d3.sankeyLinkHorizontal())
         .attr("stroke", d => d.isDiscrepancy ? severityScale(d.value) : "#bdc3c7") 
@@ -1364,7 +1350,6 @@ function drawSankeyDiagram(selector, activeData) {
         .append("title")
         .text(d => `${d.source.name} → ${d.target.name}\n${d.value} points${d.isDiscrepancy ? ' (DISCREPANCY)' : ''}`);
 
-    // Disegno dei nodi (Rect)
     svg.append("g")
         .selectAll("rect")
         .data(graph.nodes)
@@ -1379,7 +1364,6 @@ function drawSankeyDiagram(selector, activeData) {
         .append("title")
         .text(d => `${d.name}\n${d.value} points`);
 
-    // Etichette dei nodi (Testo solo ai lati)
     svg.append("g")
         .style("font-size", "11px")
         .style("font-weight", "bold")
