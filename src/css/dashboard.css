@@ -10,7 +10,7 @@ body {
     padding: 0;
     width: 100vw;
     height: 100vh;
-    overflow: hidden !important;
+    overflow: hidden !important; /* Forza l'assenza assoluta di scroll globale */
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #eaeff1;
     color: #333;
@@ -22,7 +22,7 @@ body {
 #app-grid {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-    grid-template-rows: 45px 55px minmax(0, 1.3fr) minmax(0, 1fr) 40px;
+    grid-template-rows: auto auto minmax(0, 1.3fr) minmax(0, 1fr) auto;
     grid-template-areas:
         "header header"
         "controls controls"
@@ -31,8 +31,8 @@ body {
         "footer footer";
     height: 100vh;
     width: 100vw;
-    gap: 10px;
-    padding-bottom: 10px;
+    gap: clamp(4px, 1vmin, 10px);
+    padding-bottom: clamp(6px, 1.5vh, 12px);
 }
 
 /* 2D Tab Layout */
@@ -43,7 +43,7 @@ body {
         "plots analytics"
         "plots analytics"
         "footer footer";
-    grid-template-rows: 45px 55px minmax(0, 1fr) minmax(0, 1fr) 40px;
+    grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 
 /* =========================================
@@ -53,7 +53,7 @@ body {
     grid-area: header;
     background-color: #ffffff;
     border-bottom: 1px solid #ddd;
-    padding: 0 15px;
+    padding: clamp(6px, 1vh, 12px) clamp(10px, 1.5vw, 20px);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -62,8 +62,8 @@ body {
     z-index: 10;
 }
 
-h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
-.subtitle { margin: 0; font-size: 0.8rem; color: #7f8c8d; white-space: nowrap; }
+h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: #2c3e50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.subtitle { margin: 0; font-size: clamp(0.55rem, 1vw, 0.8rem); color: #7f8c8d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .main-tab-switcher {
     display: flex;
@@ -78,8 +78,8 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 .main-tab-switcher label {
     flex: 1;
     text-align: center;
-    padding: 6px 18px;
-    font-size: 0.95rem;
+    padding: clamp(2px, 0.5vh, 4px) clamp(4px, 1vw, 12px); 
+    font-size: clamp(0.6rem, 1vw, 0.95rem);
     font-weight: 600;
     color: #495057;
     border-radius: 4px;
@@ -95,39 +95,43 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 }
 
 /* =========================================
-   TOP CONTROLS & FILTERS
+   TOP CONTROLS & FILTERS (Layout a Riga Singola)
    ========================================= */
 .top-controls {
     grid-area: controls;
     background: #ffffff;
-    padding: 0 15px;
+    padding: clamp(6px, 1vh, 12px) clamp(10px, 1.5vw, 20px);
     display: flex;
     flex-direction: row;
-    flex-wrap: nowrap;
+    flex-wrap: wrap; /* Permette alla legenda di andare sotto solo in caso di zoom estremo */
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
     z-index: 5;
-    height: 100%; 
-    overflow: hidden;
+    
+    /* Protezione contro lo zoom: blocca l'altezza e permette lo scroll solo qui dentro */
+    max-height: clamp(60px, 16vh, 120px); 
+    overflow-y: auto; 
+    overflow-x: hidden;
 }
 
 .controls-left {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 15px;
-    white-space: nowrap;
+    flex-wrap: wrap; 
+    gap: clamp(5px, 1vw, 15px);
 }
 
-.control-label { color: #2c3e50; font-size: 0.9rem; }
-.divider { width: 1px; height: 30px; background-color: #ddd; margin: 0 4px; }
+.control-label { color: #2c3e50; font-size: clamp(0.6rem, 1vw, 0.9rem); white-space: nowrap; }
+.divider { width: 1px; height: clamp(15px, 3vh, 25px); background-color: #ddd; margin: 0 clamp(2px, 0.5vw, 4px); }
 
 .segmented-control {
     display: flex;
     background-color: #e9ecef;
     border-radius: 6px;
-    padding: 3px;
+    padding: 2px;
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
@@ -136,13 +140,14 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 .segmented-control label {
     flex: 1;
     text-align: center;
-    padding: 4px 12px;
-    font-size: 0.85rem;
+    padding: clamp(2px, 0.5vh, 4px) clamp(4px, 1vw, 12px);
+    font-size: clamp(0.5rem, 0.9vw, 0.85rem);
     font-weight: 600;
     color: #495057;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
+    white-space: nowrap;
 }
 
 .segmented-control input[type="radio"]:checked + label {
@@ -158,10 +163,10 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     display: flex;
     flex-direction: column;
     justify-content: center;
-    height: 100%; 
-    flex: 1; 
-    padding-left: 20px;
-    overflow: hidden; 
+    flex: 0 1 auto; 
+    padding-left: clamp(5px, 1vw, 10px);
+    /* Stringe la tolleranza per farlo rimanere sempre a destra fino allo sfinimento */
+    min-width: 150px; 
 }
 
 #legend-gradient {
@@ -179,31 +184,32 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 5px;
-    font-size: 0.75rem; 
+    gap: clamp(3px, 0.5vw, 6px);
+    font-size: clamp(0.55rem, 0.85vw, 0.8rem);
     font-weight: bold;
+    flex-shrink: 0; /* Impedisce che il nome si stringa scomparendo */
+}
+
+.legend-cluster-item span {
+    white-space: nowrap;
 }
 
 .legend-cluster-dot {
-    width: 10px; 
-    height: 10px;
+    width: clamp(6px, 1vw, 10px);
+    height: clamp(6px, 1vw, 10px);
     border-radius: 50%;
     border: 1px solid #ccc;
+    flex-shrink: 0; 
 }
 
 .legend-labels {
-    display: flex;
+    display: flex !important; 
     justify-content: space-between;
-    font-size: 0.7rem;
+    font-size: clamp(0.45rem, 0.8vw, 0.7rem);
     margin-top: 4px;
     font-weight: bold;
     color: #555;
-}
-
-@media (max-width: 1400px) {
-    .controls-left { gap: 10px; }
-    .control-label { font-size: 0.85rem; }
-    .segmented-control label { padding: 4px 8px; font-size: 0.8rem; }
+    width: 100%;
 }
 
 /* =========================================
@@ -212,9 +218,10 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 #plots-grid, #plots-grid-2d {
     grid-area: plots;
     display: grid;
-    gap: 12px;
-    margin-left: 12px;
+    gap: clamp(4px, 1vmin, 12px);
+    margin-left: clamp(4px, 1vw, 12px);
     height: 100%;
+    min-height: 0;
 }
 
 #plots-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -237,13 +244,16 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
 
 .plot-title {
     text-align: center;
-    padding: 6px;
-    font-size: 0.9rem;
+    padding: clamp(2px, 0.5vh, 6px);
+    font-size: clamp(0.65rem, 1vw, 0.9rem);
     font-weight: 600;
     border-bottom: 1px solid #eee;
     background: #fafafa;
     flex-shrink: 0;
     color: #2c3e50;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .svg-container {
@@ -253,14 +263,16 @@ h1 { margin: 0; font-size: 1.15rem; color: #2c3e50; white-space: nowrap; }
     height: 100%;
     display: flex;
     align-items: center;
-    justify-content: center; /* FIX FATAL ERROR HERE */
+    justify-content: center; 
     padding: 0;
     overflow: hidden;
+    min-height: 0;
+    min-width: 0;
 }
 
 svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 
-/* Centroid & Anomalies Graphics */
+/* Centroid & Anomalies */
 .centroid-link { stroke-dasharray: 2; opacity: 0.6; pointer-events: none; }
 .centroid-anomaly { stroke: #c0392b; stroke-width: 2px; opacity: 0.8; z-index: 50; stroke-dasharray: none; }
 .centroid-correct { stroke: #bdc3c7; stroke-width: 0.8px; opacity: 0.3; }
@@ -270,17 +282,23 @@ svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 .pc-line { transition: stroke 0.5s ease; }
 .pc-axis path, .pc-axis line { stroke: #34495e; stroke-width: 1.5px; }
 .pc-axis text { paint-order: stroke; stroke: #ffffff; stroke-width: 3px; stroke-linecap: round; stroke-linejoin: round; }
-#pc-panel { grid-area: pc; margin: 0 12px; }
+#pc-panel { grid-area: pc; margin: 0 clamp(4px, 1vw, 12px); min-height: 0; }
 
-/* Sankey Diagram Styles */
 .sankey-link { transition: stroke-opacity 0.2s ease; cursor: pointer; }
 .sankey-node { cursor: pointer; }
 
 
 /* =========================================
-   DYNAMIC PANEL (Right Side)
+   DYNAMIC PANEL (Right Side / Live Analytics)
    ========================================= */
-#panel-dynamic { grid-area: analytics; margin-right: 12px; }
+#panel-dynamic { grid-area: analytics; margin-right: clamp(4px, 1vw, 12px); }
+
+#dynamic-svg-box {
+    padding: clamp(2px, 1vh, 10px) !important;
+    overflow: hidden !important; 
+    display: flex;
+    flex-direction: column;
+}
 
 .dynamic-content-wrapper {
     width: 100%;
@@ -290,6 +308,8 @@ svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    min-height: 0;
+    min-width: 0;
 }
 
 .hidden-panel { display: none !important; }
@@ -297,42 +317,80 @@ svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 /* Empty State / Placeholder */
 .placeholder-content {
     text-align: center;
-    padding: 20px;
+    padding: clamp(5px, 2vh, 20px);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    max-width: 80%;
+    gap: clamp(4px, 1vh, 10px);
+    max-width: 90%;
+    min-height: 0;
 }
-.placeholder-content p { margin: 0; font-weight: bold; font-size: 1.1rem; color: #2c3e50; }
-.placeholder-content span { font-size: 0.85rem; color: #7f8c8d; line-height: 1.4; }
+.placeholder-content svg { width: clamp(20px, 4vh, 32px); height: clamp(20px, 4vh, 32px); }
+.placeholder-content p { margin: 0; font-weight: bold; font-size: clamp(0.75rem, 1.2vw, 1.1rem); color: #2c3e50; }
+.placeholder-content span { font-size: clamp(0.6rem, 1vw, 0.85rem); color: #7f8c8d; line-height: 1.3; }
 
 /* Analytics Gauges */
 .stat-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     text-align: center;
-    padding: 6px 15px;
+    padding: clamp(2px, 1vh, 6px) clamp(5px, 1vw, 15px);
     background: #f8f9fa;
-    border-radius: 8px;
+    border-radius: clamp(4px, 1vh, 8px);
     border: 1px solid #eee;
     width: 80%;
-    margin-bottom: 20px;
+    margin-bottom: clamp(2px, 1.5vh, 10px);
+    min-height: 0;
+    max-height: 35%;
+    flex-shrink: 1;
 }
-.stat-card h4 { margin: 0 0 2px 0; color: #7f8c8d; font-size: 0.75rem; text-transform: uppercase; }
-.big-number { font-size: 1.6rem; font-weight: bold; margin: 0; color: #2980b9; }
+.stat-card h4 { margin: 0; color: #7f8c8d; font-size: clamp(0.5rem, 0.8vw, 0.75rem); text-transform: uppercase; }
+.big-number { font-size: clamp(1rem, 2.5vw, 1.8rem); font-weight: bold; margin: 0; color: #2980b9; line-height: 1; }
 
 .gauges-wrapper {
     display: flex;
     flex-direction: row;
     justify-content: space-around;
-    align-items: flex-end;
+    align-items: center;
     width: 100%;
-    padding: 0 10px;
+    padding: 0;
+    min-height: 0;
+    flex: 1;
 }
-.gauge-container { display: flex; flex-direction: column; align-items: center; text-align: center; width: 32%; }
-.gauge-container h4 { margin: 0 0 5px 0; color: #2c3e50; font-size: 0.75rem; text-transform: uppercase; }
-.gauge-label { font-size: 0.95rem; font-weight: bold; margin-top: 5px; color: #2980b9; }
-.gauge-container svg { height: auto; max-height: 55px; width: 100%; max-width: 100px; }
+.gauge-container { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; width: 32%; min-height: 0; }
+.gauge-container h4 { margin: 0; color: #2c3e50; font-size: clamp(0.5rem, 0.8vw, 0.75rem); text-transform: uppercase; }
+.gauge-label { font-size: clamp(0.6rem, 1vw, 0.95rem); font-weight: bold; margin-top: clamp(1px, 0.5vh, 5px); color: #2980b9; }
+.gauge-container svg { height: auto; max-height: clamp(30px, 8vh, 55px); width: 100%; max-width: 100px; }
+
+/* Radar Chart JS override */
+#radar-legend {
+    flex-wrap: wrap !important; /* PERMETTI di andare a capo pulito se non c'è spazio */
+    gap: clamp(6px, 1vw, 15px) !important;
+    font-size: clamp(0.55rem, 0.8vw, 0.75rem) !important;
+    margin-bottom: clamp(5px, 1vh, 10px) !important;
+    width: 100%;
+    justify-content: center;
+}
+#radar-legend div { 
+    white-space: nowrap; /* IMPEDISCE alle singole parole (es. "Selected Point") di spezzarsi a metà */
+    flex-shrink: 0;      /* IMPEDISCE al flexbox di schiacciare il div nascondendo le lettere */
+}
+
+/* Confusion Matrix Fixes */
+#confusion-matrix-container { padding-top: clamp(2px, 1vh, 10px) !important; justify-content: center !important; }
+#cm-main-title { font-size: clamp(0.65rem, 1vw, 0.9rem) !important; margin: 0 0 2px 0 !important; }
+#cm-desc { font-size: clamp(0.55rem, 0.8vw, 0.75rem) !important; margin: 0 0 5px 0 !important; }
+#cm-table { width: 100%; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+#cm-table table { table-layout: fixed; width: 100%; } 
+#cm-table h5 { font-size: clamp(0.55rem, 0.9vw, 0.8rem) !important; margin: clamp(2px, 0.5vh, 5px) 0 !important; }
+#cm-table th, #cm-table td { 
+    font-size: clamp(0.45rem, 0.7vw, 0.75rem) !important; 
+    padding: clamp(1px, 0.3vh, 3px) !important; 
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; 
+}
 
 
 /* =========================================
@@ -341,9 +399,10 @@ svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
 .footer-stats {
     grid-area: footer;
     display: flex;
-    gap: 12px;
-    margin: 0 12px;
+    gap: clamp(4px, 1vw, 12px);
+    margin: 0 clamp(4px, 1vw, 12px);
     height: 100%;
+    min-height: 0;
 }
 
 .footer-btn {
@@ -355,16 +414,38 @@ svg text { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     justify-content: center;
     align-items: center;
     text-align: center;
-    padding: 4px;
+    padding: clamp(1px, 0.5vh, 4px) clamp(2px, 0.5vw, 6px);
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
     border: 1px solid #e1e8ed;
     border-top: 3px solid #3498db;
     overflow: hidden;
+    min-width: 0;
 }
 
-.footer-btn .fb-label { font-size: 0.65rem; text-transform: uppercase; color: #7f8c8d; font-weight: 600; margin-bottom: 2px; }
-.footer-btn .fb-value { font-size: 1rem; font-weight: bold; color: #2c3e50; }
+.footer-btn .fb-label { 
+    font-size: clamp(0.45rem, 0.7vw, 0.65rem); 
+    text-transform: uppercase; 
+    color: #7f8c8d; 
+    font-weight: 600; 
+    margin-bottom: 2px;
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    width: 100%;
+}
+.footer-btn .fb-value { font-size: clamp(0.7rem, 1.2vw, 1rem); font-weight: bold; color: #2c3e50; line-height: 1; }
 
+#dataset-selector { 
+    font-size: clamp(0.55rem, 0.9vw, 0.85rem); 
+    font-weight: bold; 
+    border: none; 
+    background: transparent; 
+    cursor: pointer; 
+    color: #2c3e50; 
+    outline: none; 
+    width: 100%;
+    text-overflow: ellipsis;
+}
 
 /* =========================================
    TOOLTIP AND EXTRA NODES

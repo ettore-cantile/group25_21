@@ -32,7 +32,7 @@ customTableau[2] = '#2ca02c';
 const colorOriginal = d3.scaleOrdinal(customTableau);
 const bluesDiscrete = ["#08519c", "#3182bd", "#6baed6", "#9ecae1", "#c6dbef"];
 const colorPrecision = d3.scaleQuantize().domain([0, 1]).range(bluesDiscrete); 
-const redsDiscrete = ["#a50f15", "#de2d26", "#fb6a4a", "#fc9272", "#fcbba1"];
+const redsDiscrete = ["#67000d", "#cb181d", "#fb6a4a", "#fcae91", "#fee5d9"];
 const colorRecall = d3.scaleQuantize().domain([0, 1]).range(redsDiscrete);
 const rdYlGnDiscrete = ["#d73027", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"];
 const colorFScore = d3.scaleQuantize().domain([0, 1]).range(rdYlGnDiscrete);
@@ -99,9 +99,16 @@ function initDashboard(folder) {
         const kmeans2dMap = new Map();
         if(kmeans2dData?.points) kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
 
+        const formatLabel = (str) => {
+            if (!str || str === "undefined") return "Unknown";
+            return String(str).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        };
+
         // Assign to dataset
         data.points.forEach((p, i) => {
             if (csvData[i]) p.attributes = csvData[i];
+
+            p.label = formatLabel(p.label);
             
             const kData = kmeansMap.get(p.id);
             if(kData) {
@@ -120,8 +127,11 @@ function initDashboard(folder) {
 
         dataset = data.points;
         metadata = data.metadata;
+
         uniqueClasses = Array.from(new Set(dataset.map(d => String(d.label)))).sort();
         pointById = new Map(dataset.map(p => [p.id, p]));
+
+        colorOriginal.domain(uniqueClasses);
 
         // Reset domain mapping so colors always start cleanly from the beginning
         colorOriginal.domain(uniqueClasses);
@@ -472,7 +482,10 @@ function toggleDiscrepancies(show) {
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
         d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-        if (!selectedPoint && brushedPointsGlobal.length === 0) d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+        if (!selectedPoint && brushedPointsGlobal.length === 0) {
+            d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+            d3.select("#dynamic-panel-title").text("Live Analytics");
+        }
     }
 }
 
@@ -741,7 +754,7 @@ function drawRadarChart(point) {
 
     const width = container.node().clientWidth || 300;
     const height = container.node().clientHeight || 250;
-    const margin = 45; 
+    const margin = 90; 
     const radius = Math.min(width / 2, height / 2) - margin;
 
     const svg = container.append("svg")
@@ -776,6 +789,8 @@ function drawRadarChart(point) {
         .style("stroke", "#e0e0e0")
         .style("stroke-width", "0.5px");
 
+    const truncateText = (str, maxLength) => str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
+
     const axes = svg.selectAll(".axis")
         .data(radarDimensions).enter()
         .append("g")
@@ -788,15 +803,24 @@ function drawRadarChart(point) {
         .style("stroke", "#bdc3c7")
         .style("stroke-width", "1px");
 
-    axes.append("text")
-        .attr("x", (d, i) => -(radius + 15) * Math.cos((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length)))
-        .attr("y", (d, i) => -(radius + 15) * Math.sin((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length)))
-        .text(d => d.replace(/_/g, ' '))
-        .style("text-anchor", "middle")
+    const textNodes = axes.append("text")
+        .attr("x", (d, i) => -(radius + 20) * Math.cos((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length)))
+        .attr("y", (d, i) => -(radius + 20) * Math.sin((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length)))
+        .text(d => truncateText(d.replace(/_/g, ' '), 12)) // <-- Applica il limite (puoi cambiare 12 con il numero che preferisci)
+        .style("text-anchor", (d, i) => {
+            const calcX = -Math.cos((Math.PI / 2) + (2 * Math.PI * i / radarDimensions.length));
+            if (calcX > 0.1) return "start"; 
+            if (calcX < -0.1) return "end";  
+            return "middle";                 
+        })
         .style("alignment-baseline", "middle")
-        .style("font-size", "9px")
+        .style("font-size", "11.5px")
         .style("fill", "#2c3e50")
         .style("font-weight", "bold");
+
+    // 3. Aggiungiamo un title in modo che se l'utente passa il mouse sulla scritta coi puntini, veda il nome completo
+    textNodes.append("title")
+        .text(d => d.replace(/_/g, ' '));
 
     const lineBuilder = d3.line().x(d => d.x).y(d => d.y).curve(d3.curveLinearClosed);
 
@@ -1058,18 +1082,17 @@ function drawNeighborGraph(centerNode, neighborNodes) {
     const svg = d3.select("#neighbor-graph-svg");
     svg.selectAll("*").remove();
 
-    const parentBox = document.getElementById("dynamic-svg-box");
-    const width = (parentBox.clientWidth || 300) - 20;
-    const height = (parentBox.clientHeight || 300) - 20;
-
-    const size = Math.min(width, height);
-    const xOffset = (width - size) / 2;
-    const yOffset = (height - size) / 2;
+    // Impostiamo un sistema di coordinate fisso (300x300). 
+    // viewBox e preserveAspectRatio faranno sì che sia sempre centrato e scalato correttamente nel div padre.
+    const baseSize = 300;
+    svg.attr("viewBox", `0 0 ${baseSize} ${baseSize}`)
+       .attr("preserveAspectRatio", "xMidYMid meet");
     
-    const g = svg.append("g").attr("transform", `translate(${xOffset}, ${yOffset})`);
+    // Rimuoviamo i translate() manuali
+    const g = svg.append("g");
 
-    const centerRadius = Math.max(10, size * 0.06); 
-    const neighborRadius = Math.max(6, size * 0.04);
+    const centerRadius = 15; 
+    const neighborRadius = 10;
 
     const graphNodes = [centerNode, ...neighborNodes].map(n => ({...n}));
     const graphLinks = neighborNodes.map(n => ({
@@ -1079,14 +1102,14 @@ function drawNeighborGraph(centerNode, neighborNodes) {
 
     const centerGraphNode = graphNodes.find(n => n.id === centerNode.id);
     if (centerGraphNode) {
-        centerGraphNode.fx = size / 2;
-        centerGraphNode.fy = size / 2;
+        centerGraphNode.fx = baseSize / 2;
+        centerGraphNode.fy = baseSize / 2;
     }
 
     const simulation = d3.forceSimulation(graphNodes)
-        .force("link", d3.forceLink(graphLinks).id(d => d.id).distance(size / 3.2).strength(0.7))
-        .force("charge", d3.forceManyBody().strength(-size * 1.5))
-        .force("center", d3.forceCenter(size / 2, size / 2));
+        .force("link", d3.forceLink(graphLinks).id(d => d.id).distance(80).strength(0.7))
+        .force("charge", d3.forceManyBody().strength(-250))
+        .force("center", d3.forceCenter(baseSize / 2, baseSize / 2));
 
     const link = g.append("g")
         .selectAll("line")
@@ -1099,7 +1122,7 @@ function drawNeighborGraph(centerNode, neighborNodes) {
         .data(graphNodes)
         .join("g")
         .attr("class", d => d.id === centerNode.id ? "neighbor-node center" : "neighbor-node")
-        .call(drag(simulation, centerNode, size));
+        .call(drag(simulation, centerNode, baseSize));
 
     node.append("circle")
         .attr("r", d => d.id === centerNode.id ? centerRadius : neighborRadius)
@@ -1126,8 +1149,9 @@ function drag(simulation, centerNode, size) {
         d.fy = d.y;
     }
     function dragged(event, d) {
-        d.fx = Math.max(0, Math.min(size, event.x));
-        d.fy = Math.max(0, Math.min(size, event.y));
+        // Limita il trascinamento all'interno del viewBox 300x300
+        d.fx = Math.max(15, Math.min(size - 15, event.x));
+        d.fy = Math.max(15, Math.min(size - 15, event.y));
     }
     function dragended(event, d) {
         if (!event.active) simulation.alphaTarget(0);
@@ -1156,7 +1180,8 @@ function drawSankeyDiagram(selector, activeData) {
 
     const width = container.node().clientWidth;
     const height = container.node().clientHeight;
-    const margin = { top: 15, right: 40, bottom: 15, left: 40 };
+    // Lasciamo un po' più di margine in basso per la legenda fluttuante
+    const margin = { top: 15, right: 40, bottom: 50, left: 40 };
 
     const svg = container.append("svg")
         .attr("viewBox", `0 0 ${width} ${height}`)
@@ -1210,6 +1235,81 @@ function drawSankeyDiagram(selector, activeData) {
 
     const links = Array.from(linkMap.values());
 
+    // --- NUOVA LOGICA: Scala Discreta (Threshold) e calcolo Bucket ---
+    const maxDiscrepancy = d3.max(links.filter(l => l.isDiscrepancy), d => d.value) || 1;
+    
+    // Scegliamo fino a 5 colori in base a quanti errori ci sono al massimo
+    const baseColors = ["#fcae91", "#fb6a4a", "#ef3b2c", "#cb181d", "#99000d"];
+    const numColors = Math.min(maxDiscrepancy, 5);
+    const severityColors = baseColors.slice(0, numColors);
+    
+    // Calcolo dinamico degli step interi (es. se max è 10 e abbiamo 5 colori, lo step è 2)
+    const step = Math.max(1, Math.ceil(maxDiscrepancy / numColors));
+    const thresholds = severityColors.map((_, i) => (i + 1) * step + 1).slice(0, -1);
+    
+    const severityScale = d3.scaleThreshold()
+        .domain(thresholds)
+        .range(severityColors);
+
+    // --- Disegno Legenda in HTML Fluttuante ---
+    const legendHtml = container.append("div")
+        .attr("class", "sankey-legend-html")
+        .style("position", "absolute")
+        .style("bottom", "5px") // Abbassata al limite per non coprire i nodi
+        .style("left", "50%")
+        .style("transform", "translateX(-50%)")
+        .style("display", "flex")
+        .style("flex-direction", "column")
+        .style("align-items", "center")
+        .style("z-index", "10")
+        .style("width", "150px")
+        .style("pointer-events", "none"); // Trasparente ai click
+
+    legendHtml.append("div")
+        .style("font-size", "0.6rem")
+        .style("font-weight", "bold")
+        .style("color", "#2c3e50") // Grigio più leggero
+        .style("margin-bottom", "3px")
+        .text("Discrepancy Severity");
+
+    const colorStrip = legendHtml.append("div")
+        .style("display", "flex")
+        .style("width", "100%")
+        .style("height", "8px") // Ancora più sottile
+        .style("border-radius", "2px")
+        .style("overflow", "hidden");
+
+    severityColors.forEach(color => {
+        colorStrip.append("div")
+            .style("flex", "1")
+            .style("height", "100%")
+            .style("background-color", color);
+    });
+
+    const labelsStrip = legendHtml.append("div")
+        .style("display", "flex")
+        .style("width", "100%")
+        .style("justify-content", "space-between")
+        .style("margin-top", "2px");
+
+    let prevVal = 1;
+    severityColors.forEach((color, i) => {
+        let th = thresholds[i];
+        let label = (th === undefined) 
+            ? (prevVal >= maxDiscrepancy ? `${prevVal}` : `${prevVal}+`) 
+            : (prevVal === th - 1 ? `${prevVal}` : `${prevVal}-${th - 1}`);
+        prevVal = th;
+        
+        labelsStrip.append("span")
+            .style("flex", "1")
+            .style("text-align", "center")
+            .style("font-size", "0.55rem")
+            .style("color", "#2c3e50")
+            .style("font-weight", "bold")
+            .text(label);
+    });
+
+    // --- Disegno Sankey ---
     const sankey = d3.sankey()
         .nodeWidth(20)
         .nodePadding(15)
@@ -1226,6 +1326,7 @@ function drawSankeyDiagram(selector, activeData) {
         return;
     }
 
+    // Ordina i link per disegnare prima le concordanze e sopra le discrepanze (evita sovrapposizioni visive)
     graph.links.sort((a, b) => (a.isDiscrepancy === b.isDiscrepancy ? 0 : a.isDiscrepancy ? 1 : -1));
 
     const linkGroup = svg.append("g")
@@ -1234,47 +1335,33 @@ function drawSankeyDiagram(selector, activeData) {
         .data(graph.links)
         .enter().append("g");
 
+    // Disegno delle linee (Path)
     linkGroup.append("path")
         .attr("d", d3.sankeyLinkHorizontal())
-        .attr("stroke", d => d.isDiscrepancy ? "#c0392b" : "#bdc3c7") 
-        .attr("stroke-width", d => d.isDiscrepancy ? Math.max(3, d.width) : Math.max(1, d.width))
-        .style("stroke-opacity", d => d.isDiscrepancy ? 0.85 : 0.25)
+        .attr("stroke", d => d.isDiscrepancy ? severityScale(d.value) : "#bdc3c7") 
+        .attr("stroke-width", d => d.isDiscrepancy ? 1.5 : Math.max(1, d.width))
+        .style("stroke-opacity", d => d.isDiscrepancy ? 0.9 : 0.25)
         .attr("class", "sankey-link")
-        .style("cursor", "pointer")
         .on("mouseover", function(event, d) {
             d3.selectAll(".sankey-link").style("stroke-opacity", 0.1);
-            d3.select(this).style("stroke-opacity", 0.9).raise();
+            d3.select(this).style("stroke-opacity", 1.0).raise();
         })
         .on("mouseout", function() {
-            d3.selectAll(".sankey-link").style("stroke-opacity", l => l.isDiscrepancy ? 0.85 : 0.25);
+            d3.selectAll(".sankey-link").style("stroke-opacity", l => l.isDiscrepancy ? 0.9 : 0.25);
         })
         .on("click", function(event, d) {
             event.stopPropagation();
             const linkPointIds = new Set(d.points.map(p => p.id));
-            
             d3.selectAll(".dot:not(.filtered-out)")
                 .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
-                .attr("r", p => linkPointIds.has(p.id) ? currentPointSize * 1.5 : currentPointSize)
-                .attr("stroke-width", p => linkPointIds.has(p.id) ? 2 : 0.8);
-                
+                .attr("r", p => linkPointIds.has(p.id) ? currentPointSize * 1.5 : currentPointSize);
             d3.selectAll(".dot:not(.filtered-out)").filter(p => linkPointIds.has(p.id)).raise();
         })
         .append("title")
         .text(d => `${d.source.name} → ${d.target.name}\n${d.value} points${d.isDiscrepancy ? ' (DISCREPANCY)' : ''}`);
 
-    linkGroup.append("text")
-        .attr("x", d => d.source.x1 + (d.target.x0 - d.source.x1) / 2)
-        .attr("y", d => d.y0 + (d.y1 - d.y0) / 2)
-        .attr("dy", "0.35em")
-        .attr("text-anchor", "middle")
-        .style("fill", "#ffffff")
-        .style("font-size", "15px")
-        .style("font-weight", "900")
-        .style("text-shadow", "0px 0px 4px #000000, 0px 0px 8px #000000") 
-        .style("pointer-events", "none") 
-        .text(d => d.value);
-
-    const node = svg.append("g")
+    // Disegno dei nodi (Rect)
+    svg.append("g")
         .selectAll("rect")
         .data(graph.nodes)
         .enter().append("rect")
@@ -1288,11 +1375,10 @@ function drawSankeyDiagram(selector, activeData) {
         .append("title")
         .text(d => `${d.name}\n${d.value} points`);
 
+    // Etichette dei nodi (Testo solo ai lati)
     svg.append("g")
         .style("font-size", "11px")
-        .style("font-family", "sans-serif")
         .style("font-weight", "bold")
-        .style("fill", "#2c3e50")
         .selectAll("text")
         .data(graph.nodes)
         .enter().append("text")

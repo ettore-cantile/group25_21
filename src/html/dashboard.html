@@ -28,7 +28,7 @@
         <section class="top-controls">
             <div class="controls-left">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span class="control-label"><strong>Color Scale:</strong></span>
+                    <span class="control-label"><strong>Metrics:</strong></span>
                     <div class="control-group">
                         </div>
                 </div>
@@ -57,13 +57,14 @@
 
                 <div class="divider"></div>
 
-                <div style="display: flex; align-items: center; gap: 5px; margin-right: 15px;">
+                <div style="display: flex; align-items: center; gap: 5px;">
                     <input type="checkbox" id="show-discrepancies" name="show-discrepancies">
-                    <label for="show-discrepancies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: #c0392b;">Show Centroid Anomalies</label>
+                    <label for="show-discrepancies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: #c0392b;">Show Centroids</label>
                 </div>
 
+                <div class="divider tab-13d" style="margin:0"></div>
+
                 <div class="tab-13d" style="display: flex; align-items: center; gap: 8px;">
-                    <div class="divider"></div>
                     <div class="control-label" style="font-weight: bold;">K-Means Source:</div>
                     <div class="segmented-control">
                         <input type="radio" id="ks-pca" name="kmeansSource" value="pca" checked>
@@ -196,7 +197,7 @@
         <footer class="footer-stats" id="global-footer">
             <div class="footer-btn">
                 <div class="fb-label">Select Dataset</div>
-                <select id="dataset-selector" style="font-size: 0.9rem; font-weight: bold; border: none; background: transparent; cursor: pointer; color: #2c3e50; outline: none;">
+                <select id="dataset-selector" style="font-size: 0.9rem; font-weight: bold; text-align: center; border: none; background: transparent; cursor: pointer; color: #2c3e50; outline: none;">
                     <option value="wine" selected>Wine Quality</option>
                     <option value="iris">Iris Flowers</option>
                     <option value="user_knowledge">User Knowledge</option>
