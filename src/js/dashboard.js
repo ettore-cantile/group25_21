@@ -955,7 +955,8 @@ function resetAllHovers() {
             .style("stroke", "var(--dot-stroke)")
             .style("stroke-width", 0.8);
         d3.selectAll(".pc-line")
-            .style("stroke-width", 1.5);
+            .style("stroke-width", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5)
+            .style("opacity", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6);
     }
     hideTooltip();
 }
@@ -1034,6 +1035,12 @@ function updateColors() {
         .style("stroke", d => {
             if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
             return getColor(d);
+        })
+        .style("stroke-width", d => {
+            return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+        })
+        .style("opacity", d => {
+            return (showAnon && d.is_anomaly && colorMode === 'original') ? 0.9 : 0.6;
         });
 }
 
@@ -1549,8 +1556,14 @@ function drawParallelCoordinates(containerSelector) {
             if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
             return getColor(d);
         })
-        .style("stroke-width", 1.5)
-        .style("opacity", 0.6)
+        .style("stroke-width", d => {
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+        })
+        .style("opacity", d => {
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            return (showAnon && d.is_anomaly && colorMode === 'original') ? 0.9 : 0.6;
+        })
         .on("mouseover", function(event, d) {
             resetAllHovers();
             d3.selectAll(`.dot.pt-${d.id}`)

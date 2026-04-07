@@ -216,9 +216,17 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 
 /* Parallel Coordinates */
 .pc-line { transition: stroke 0.5s ease; }
-.pc-axis path, .pc-axis line { stroke: var(--pc-axis) !important; stroke-width: 1.5px; }
-.pc-axis text { paint-order: stroke; stroke: var(--pc-axis-text-stroke) !important; stroke-width: 3px; stroke-linecap: round; stroke-linejoin: round; }
-#pc-panel { grid-area: pc; margin: 0 clamp(4px, 1vw, 12px); min-height: 0; }
+.pc-axis path, .pc-axis line { stroke: var(--text-title) !important; stroke-width: 2px; }
+.pc-axis text { 
+    fill: var(--text-main) !important; 
+    font-weight: bold; 
+    font-size: 0.75rem; 
+    paint-order: stroke; 
+    stroke: var(--bg-panel) !important; 
+    stroke-width: 4px; 
+    stroke-linecap: round; 
+    stroke-linejoin: round; 
+}#pc-panel { grid-area: pc; margin: 0 clamp(4px, 1vw, 12px); min-height: 0; }
 
 .sankey-link { transition: stroke-opacity 0.2s ease; cursor: pointer; }
 .sankey-node { cursor: pointer; }
