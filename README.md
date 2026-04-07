@@ -8,7 +8,10 @@ The main goal is to evaluate the **fidelity of PCA** (assessment and judgment) w
 ---
 
 ## 📊 Dataset
-The project uses the **Wine dataset**.
+The project uses the following datasets:
+- **Wine**
+- **Iris**
+- **User Knowledge Modelling**
 
 ---
 
@@ -24,7 +27,7 @@ Report the quality of PCA (what goes wrong; what the false positives are) and Eu
 
 ### 2. Labels, K-Means Clustering, and Discrepancies
 Introduce labels (abstract ones, like wine producers, and data-dependent ones). 
-* **Cluster Analysis:** The objective is to evaluate the discrepancies between 3 abstract clusters (which do not depend on the Euclidean distance calculation and are therefore independent of the dataset values) and 3 data-inherent clusters, using techniques like **K-Means**.
+* **Cluster Analysis:** The objective is to evaluate the discrepancies between abstract clusters (which do not depend on the Euclidean distance calculation and are therefore independent of the dataset values) and data-inherent clusters, using techniques like **K-Means**.
 * **Visualizing Anomalies:** The visualization must offer the possibility to show the portions of the clusters that do not seem to belong to their assigned cluster via centroids (Note: some tools/references should have already been published by Santucci himself).
 * **Additional Tools:** Quality metrics and **filters** (for the removal of false positives or negatives) must be present, utilizing both Euclidean MDS and PCA.
 
