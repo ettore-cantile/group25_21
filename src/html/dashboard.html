@@ -37,8 +37,8 @@
                 </button>
 
                 <div class="segmented-control main-tab-switcher">
-                    <input type="radio" id="tab-13d" name="mainTab" value="13d" checked>
-                    <label for="tab-13d">MDS vs PCA 13D</label>
+                    <input type="radio" id="tab-nd" name="mainTab" value="nd" checked>
+                    <label for="tab-nd">MDS vs PCA ND</label>
                     <input type="radio" id="tab-2d" name="mainTab" value="2d">
                     <label for="tab-2d">MDS vs PCA 2D</label>
                 </div>
@@ -77,15 +77,18 @@
 
                 <div class="divider"></div>
 
-                <div style="display: flex; align-items: center; gap: 5px; margin-right: 15px;">
-                    <input type="checkbox" id="show-anomalies" name="show-anomalies">
-                    <label for="show-anomalies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color);">Show Anomalies</label>
-                    
-                    <input type="checkbox" id="show-discrepancies" name="show-discrepancies" style="margin-left: 10px;">
-                    <label for="show-discrepancies" style="font-size: 0.85rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color);">Show Centroids</label>
+                <div style="display: flex; flex-direction: column; gap: 6px; margin-right: 15px; justify-content: center;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input type="checkbox" id="show-anomalies" name="show-anomalies" style="margin: 0;">
+                        <label for="show-anomalies" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color); margin: 0;">Show Anomalies</label>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <input type="checkbox" id="show-discrepancies" name="show-discrepancies" style="margin: 0;">
+                        <label for="show-discrepancies" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color); margin: 0;">Show Centroids</label>
+                    </div>
                 </div>
 
-                <div class="tab-13d" style="display: flex; align-items: center; gap: 8px;">
+                <div class="tab-nd" style="display: flex; align-items: center; gap: 8px;">
                     <div class="divider"></div>
                     <div class="control-label" style="font-weight: bold;">K-Means Source:</div>
                     <div class="segmented-control">
@@ -106,7 +109,7 @@
             </div>
         </section>
 
-        <div id="plots-grid" class="tab-content tab-13d">
+        <div id="plots-grid" class="tab-content tab-nd">
             <div class="plot-container">
                 <div class="plot-title">PCA Projection</div>
                 <div id="pca-plot" class="svg-container"></div>
@@ -121,7 +124,7 @@
             </div>
         </div>
 
-        <div class="plot-container tab-content tab-13d" id="pc-panel">
+        <div class="plot-container tab-content tab-nd" id="pc-panel">
             <div class="plot-title">Parallel Coordinates (Original Attributes)</div>
             <div id="pc-plot" class="svg-container"></div>
         </div>
@@ -169,11 +172,11 @@
                 </div>
 
                 <div id="gauges-container" class="dynamic-content-wrapper hidden-panel">
-                    <div class="stat-card">
-                        <h4>Selected Points</h4>
-                        <p class="big-number" id="stat-count">0</p>
-                    </div>
-                    <div class="gauges-wrapper">
+                    <div class="gauges-wrapper" style="flex-wrap: wrap;">
+                        <div class="stat-card stat-centered-card" style="border: none; background: transparent; width: 100%; margin-bottom: 5px;">
+                            <h4 style="font-size: 0.85rem; color: var(--text-title);">Selected Points</h4>
+                            <p class="big-number" id="stat-count" style="font-size: 2.2rem; color: var(--control-sel-text);">0</p>
+                        </div>
                         <div class="gauge-container">
                             <h4>Precision</h4>
                             <svg id="gauge-precision"></svg>

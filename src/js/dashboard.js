@@ -85,6 +85,8 @@ function initDashboard(folder) {
             const allKeys = Object.keys(csvData[0]);
             radarDimensions = allKeys.filter(k => !['producer', 'label', 'class', 'species', 'variety', 'unnamed', 'uns'].some(sub => k.toLowerCase().includes(sub)));
         }
+        
+        d3.select("label[for='tab-nd']").text(`MDS vs PCA ${radarDimensions.length}D`);
 
         const kmeansMap = new Map();
         if(kmeansData?.points) kmeansData.points.forEach(p => kmeansMap.set(p.id, p));
@@ -166,7 +168,7 @@ function initDashboard(folder) {
         }
 
         d3.select("#app-grid").classed("mode-2d", false);
-        d3.selectAll(".tab-13d").classed("hidden-panel", false);
+        d3.selectAll(".tab-nd").classed("hidden-panel", false);
         d3.selectAll(".tab-2d").classed("hidden-panel", true);
         document.body.clientWidth; 
 
@@ -180,7 +182,7 @@ function initDashboard(folder) {
         drawParallelCoordinates("#pc-plot");
 
         d3.select("#app-grid").classed("mode-2d", true);
-        d3.selectAll(".tab-13d").classed("hidden-panel", true);
+        d3.selectAll(".tab-nd").classed("hidden-panel", true);
         d3.selectAll(".tab-2d").classed("hidden-panel", false);
         document.body.clientWidth; 
 
@@ -203,10 +205,10 @@ function initDashboard(folder) {
         });
         drawSankeyDiagram("#comparison-plot", dataset);
 
-        const is13D = d3.select("input[name='mainTab']:checked").node().value === '13d';
-        d3.select("#app-grid").classed("mode-2d", !is13D);
-        d3.selectAll(".tab-13d").classed("hidden-panel", !is13D);
-        d3.selectAll(".tab-2d").classed("hidden-panel", is13D);
+        const isND = d3.select("input[name='mainTab']:checked").node().value === 'nd';
+        d3.select("#app-grid").classed("mode-2d", !isND);
+        d3.selectAll(".tab-nd").classed("hidden-panel", !isND);
+        d3.selectAll(".tab-2d").classed("hidden-panel", isND);
         document.body.clientWidth; 
 
         setupBrushing();
@@ -279,13 +281,13 @@ d3.selectAll("input[name='kmeansSource']").on("change", function() {
 d3.selectAll("input[name='mainTab']").on("change", function() {
     const selectedTab = this.value;
     
-    if (selectedTab === '13d') {
+    if (selectedTab === 'nd') {
         d3.select("#app-grid").classed("mode-2d", false);
-        d3.selectAll(".tab-13d").classed("hidden-panel", false);
+        d3.selectAll(".tab-nd").classed("hidden-panel", false);
         d3.selectAll(".tab-2d").classed("hidden-panel", true);
     } else {
         d3.select("#app-grid").classed("mode-2d", true);
-        d3.selectAll(".tab-13d").classed("hidden-panel", true);
+        d3.selectAll(".tab-nd").classed("hidden-panel", true);
         d3.selectAll(".tab-2d").classed("hidden-panel", false);
         
         const activeData = brushedPointsGlobal.length > 1 
@@ -500,6 +502,39 @@ function toggleDiscrepancies(show) {
             d3.select("#dynamic-panel-title").text("Live Analytics");
         }
     }
+    
+    // RESTORE SELECTION
+    if (selectedPoint) {
+        const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+        const activeIds = new Set([selectedPoint.id, ...(selectedPoint.neighbors || [])]);
+        
+        d3.selectAll(".dot:not(.filtered-out)")
+            .style("opacity", p => {
+                if (p.id === selectedPoint.id) return 1;
+                if (currentTab === 'nd' && activeIds.has(p.id)) return 0.8;
+                return 0.1;
+            });
+            
+        d3.selectAll(".pc-line:not(.filtered-out)")
+            .style("opacity", p => {
+                if (p.id === selectedPoint.id) return 1;
+                if (currentTab === 'nd' && activeIds.has(p.id)) return 0.6;
+                return 0.05;
+            });
+
+        if (currentTab === 'nd') {
+            d3.selectAll(".pc-line:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
+            d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
+        } else {
+            d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === selectedPoint.id).raise();
+        }
+        
+    } else if (brushedPointsGlobal.length > 0) {
+        dataset.forEach(d => {
+            const isSelected = brushedPointsGlobal.includes(d);
+            d3.selectAll(`.pt-${d.id}:not(.filtered-out)`).style("opacity", isSelected ? 0.9 : 0.15);
+        });
+    }
 }
 
 function updateConfusionMatrix(activePoints, tabMode) {
@@ -545,7 +580,7 @@ function updateConfusionMatrix(activePoints, tabMode) {
     };
 
     let fullHtml = "";
-    if (tabMode === '13d') {
+    if (tabMode === 'nd') {
         fullHtml = generateTableHtml('kmeans_cluster', 'Global N-Dim K-Means');
     } else {
         fullHtml = generateTableHtml('pca_kmeans_cluster', 'PCA 2D K-Means');
@@ -568,7 +603,7 @@ function updateSelection(d) {
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
 
-    if (currentTab === '13d') {
+    if (currentTab === 'nd') {
         d3.select("#dynamic-panel-title").text("Neighbor Graph");
         d3.select("#radar-empty-state").classed("hidden-panel", true);
         d3.select("#radar-chart-container").classed("hidden-panel", true);
@@ -996,7 +1031,10 @@ function updateColors() {
         .attr("r", d => getRadius(d.is_anomaly));
     
     d3.selectAll(".pc-line").transition().duration(500)
-        .style("stroke", d => getColor(d));
+        .style("stroke", d => {
+            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
+            return getColor(d);
+        });
 }
 
 function updateLegend() {
