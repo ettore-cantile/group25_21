@@ -29,6 +29,8 @@ let kmeansClusterAvg = {};
 // Color Scales
 const customTableau = [...d3.schemeTableau10];
 customTableau[2] = '#2ca02c'; 
+customTableau[3] = '#9b59b6'; // Distinct purple for the 4th class (e.g., Very Low in user_knowledge)
+
 const colorOriginal = d3.scaleOrdinal(customTableau);
 const bluesDiscrete = ["#08519c", "#3182bd", "#6baed6", "#9ecae1", "#c6dbef"];
 const colorPrecision = d3.scaleQuantize().domain([0, 1]).range(bluesDiscrete); 
@@ -98,7 +100,6 @@ function initDashboard(folder) {
             return String(str).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         };
 
-        // CORE FIX: Apply formatLabel to ALL cluster attributes to ensure exact string matching with true labels
         data.points.forEach((p, i) => {
             if (csvData[i]) p.attributes = csvData[i];
 
@@ -332,7 +333,6 @@ d3.selectAll("input[name='kmeansSource']").on("change", function() {
     redrawKMeansPlot();
 });
 
-// Event listener for the Sankey Mode Segemented Control
 d3.selectAll("input[name='sankeyMode']").on("change", function() {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     if (currentTab === '2d') {
@@ -1056,7 +1056,7 @@ function getColor(d) {
     if (colorMode === 'original') return colorOriginal(d.label);
     if (colorMode === 'precision') return colorPrecision(d.precision);
     if (colorMode === 'recall') return colorRecall(d.recall);
-    if (colorMode === 'fscore') return colorFScore(d.f_score);
+    if (colorMode === 'fscore') return colorFScore(d.fscore);
 }
 
 function updateColors() {
@@ -1305,7 +1305,6 @@ function drag(simulation, centerNode, size) {
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
 }
 
-// --- DYNAMIC SANKEY GENERATION ---
 function drawSankeyDiagram(selector, activeData) {
     const container = d3.select(selector);
     if (container.empty()) return;
@@ -1339,7 +1338,7 @@ function drawSankeyDiagram(selector, activeData) {
     if (sankeyMode === 'pca-mds') {
         sourceKey = 'pca_kmeans_cluster';
         targetKey = 'mds_kmeans_cluster';
-        sourcePrefix = 'PCA '; // Pulito, senza la 'C'
+        sourcePrefix = 'PCA '; 
         targetPrefix = 'MDS ';
         isDiscrepancyFn = (d) => String(d.pca_kmeans_cluster) !== String(d.mds_kmeans_cluster);
     } else if (sankeyMode === 'gt-pca') {
