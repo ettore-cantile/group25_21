@@ -405,7 +405,14 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
     svgRoot.on("click", () => {
         selectedPoint = null;
         brushedPointsGlobal = [];
-        d3.selectAll(".dot, .pc-line").style("opacity", 0.9);
+        d3.selectAll(".dot").style("opacity", 0.9);
+        
+        // Return PC Lines to default visibility and stroke
+        d3.selectAll(".pc-line")
+          .style("opacity", 0.6)
+          .style("stroke-width", 1.5)
+          .style("stroke", d => getLineColor(d));
+          
         d3.selectAll(".link-group line").remove();
         resetAllHovers();
         updateLiveAnalytics([]); 
@@ -455,9 +462,13 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
               .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, true); })
               .style("stroke", (showAnon && isAnom) ? "var(--anomaly-hover)" : "var(--hover-stroke)")
               .style("stroke-width", 2).raise();
+              
+            // FORCE PC Line highlight on hover to maximum clarity with secure color
             d3.selectAll(`.pc-line.pt-${d.id}`)
-              .style("stroke", (showAnon && d.is_anomaly && colorMode === 'original') ? "var(--anomaly-hover)" : null)
-              .style("stroke-width", 3).raise();
+              .style("opacity", 1) 
+              .style("stroke", (showAnon && d.is_anomaly && colorMode === 'original') ? "var(--anomaly-hover)" : getLineColor(d))
+              .style("stroke-width", 4).raise();
+              
             showTooltip(event, d);
         })
         .on("mouseout", function() { resetAllHovers(); })
@@ -552,7 +563,10 @@ function toggleDiscrepancies(show) {
         d3.selectAll(".dot.dot-kmeans:not(.filtered-out)").style("opacity", d => d.is_anomaly ? 1.0 : 0.2);
         d3.selectAll(".dot.dot-pca2d:not(.filtered-out)").style("opacity", d => d.pca_is_anomaly ? 1.0 : 0.2);
         d3.selectAll(".dot.dot-mds2d:not(.filtered-out)").style("opacity", d => d.mds_is_anomaly ? 1.0 : 0.2);
-        d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
+        
+        if (!selectedPoint) {
+            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5).style("stroke", d => getLineColor(d));
+        }
 
         let activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
         if (!selectedPoint) updateConfusionMatrix(activePoints, currentTab);
@@ -560,7 +574,9 @@ function toggleDiscrepancies(show) {
     } else {
         allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
-        d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5);
+        if (!selectedPoint) {
+            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5).style("stroke", d => getLineColor(d));
+        }
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
         if (!selectedPoint && brushedPointsGlobal.length === 0) {
             d3.select("#empty-state-placeholder").classed("hidden-panel", false);
@@ -568,7 +584,7 @@ function toggleDiscrepancies(show) {
         }
     }
     
-    // RESTORE SELECTION
+    // RESTORE SELECTION LOGIC AFTER TOGGLE
     if (selectedPoint) {
         const currentTab = d3.select("input[name='mainTab']:checked").node().value;
         const activeIds = new Set([selectedPoint.id, ...(selectedPoint.neighbors || [])]);
@@ -580,17 +596,17 @@ function toggleDiscrepancies(show) {
                 return 0.1;
             });
             
+        // PC-LINE: Highlight ONLY selected point, fade ALL others
         d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("opacity", p => {
-                if (p.id === selectedPoint.id) return 1;
-                if (currentTab === 'nd' && activeIds.has(p.id)) return 0.6;
-                return 0.05;
-            });
+            .style("stroke", d => getLineColor(d)) // Make sure color is robust
+            .style("opacity", p => p.id === selectedPoint.id ? 1 : 0.05)
+            .style("stroke-width", p => p.id === selectedPoint.id ? 4 : 1);
 
         if (currentTab === 'nd') {
-            d3.selectAll(".pc-line:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
+            d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === selectedPoint.id).raise();
             d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
         } else {
+            d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === selectedPoint.id).raise();
             d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === selectedPoint.id).raise();
         }
         
@@ -677,6 +693,7 @@ function updateSelection(d) {
         const neighborIds = d.neighbors || [];
         const activeIds = new Set([d.id, ...neighborIds]);
 
+        // SCATTERPLOTS: Keep neighbors visible/highlighted
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.8 : 0.1))
             .attr("d", function(p) {
@@ -684,11 +701,13 @@ function updateSelection(d) {
             })
             .style("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
+        // PARALLEL COORDINATES: Highlight ONLY selected point, completely ignoring neighbors
         d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.6 : 0.05))
-            .style("stroke-width", p => p.id === d.id ? 3 : 1.5);
+            .style("stroke", p => getLineColor(p)) // Ensure color is present
+            .style("opacity", p => p.id === d.id ? 1 : 0.05)
+            .style("stroke-width", p => p.id === d.id ? 4 : 1);
 
-        d3.selectAll(".pc-line:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
+        d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
         d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
 
         const kmeansXKey = scalesMap['kmeans'].xKey;
@@ -717,6 +736,12 @@ function updateSelection(d) {
             })
             .style("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
+        d3.selectAll(".pc-line:not(.filtered-out)")
+            .style("stroke", p => getLineColor(p)) // Ensure color is present
+            .style("opacity", p => p.id === d.id ? 1 : 0.05)
+            .style("stroke-width", p => p.id === d.id ? 4 : 1);
+
+        d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
         d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === d.id).raise();
         d3.selectAll(".link-group line").remove();
 
@@ -776,7 +801,8 @@ function handleBrush(event, brushObj, xKey, yKey) {
         if (event.type === "end") {
             selectedPoint = null;
             brushedPointsGlobal = [];
-            d3.selectAll(".dot:not(.filtered-out), .pc-line:not(.filtered-out)").style("opacity", 0.9); 
+            d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9); 
+            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5).style("stroke", d => getLineColor(d));
             resetAllHovers(); 
             updateLiveAnalytics([]); 
         }
@@ -982,6 +1008,12 @@ function drawRadarChart(point) {
 
 // --- UTILITIES ---
 
+function getLineColor(d) {
+    const showAnon = d3.select("#show-anomalies").property("checked");
+    if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
+    return getColor(d);
+}
+
 function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
     const showAnon = d3.select("#show-anomalies").property("checked");
     let isAnom = false;
@@ -1002,12 +1034,20 @@ function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
 
 function resetAllHovers() {
     if (selectedPoint) {
+        // Scatterplot dots: Reset hovered dot sizes but keep selected distinct
         d3.selectAll(".dot")
             .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, p.id === selectedPoint.id); })
             .style("stroke", p => p.id === selectedPoint.id ? "var(--hover-stroke)" : "var(--dot-stroke)")
             .style("stroke-width", p => p.id === selectedPoint.id ? 2 : 0.8);
+            
+        // PC Lines: ENSURE strict focus on the selected point alone
         d3.selectAll(".pc-line")
-            .style("stroke-width", p => p.id === selectedPoint.id ? 3 : 1.5);
+            .style("stroke", d => getLineColor(d)) // Restore color
+            .style("opacity", p => p.id === selectedPoint.id ? 1 : 0.05)
+            .style("stroke-width", p => p.id === selectedPoint.id ? 4 : 1);
+            
+        d3.selectAll(".pc-line").filter(p => p.id === selectedPoint.id).raise();
+        
     } else {
         d3.selectAll(".dot")
             .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, false); })
@@ -1016,6 +1056,7 @@ function resetAllHovers() {
         
         const showAnon = d3.select("#show-anomalies").property("checked");
         d3.selectAll(".pc-line")
+            .style("stroke", d => getLineColor(d)) // Restore color
             .style("stroke-width", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5)
             .style("opacity", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6);
     }
@@ -1056,7 +1097,7 @@ function getColor(d) {
     if (colorMode === 'original') return colorOriginal(d.label);
     if (colorMode === 'precision') return colorPrecision(d.precision);
     if (colorMode === 'recall') return colorRecall(d.recall);
-    if (colorMode === 'fscore') return colorFScore(d.fscore);
+    if (colorMode === 'fscore') return colorFScore(d.f_score);
 }
 
 function updateColors() {
@@ -1079,14 +1120,14 @@ function updateColors() {
         });
     
     d3.selectAll(".pc-line").transition().duration(500)
-        .style("stroke", d => {
-            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
-            return getColor(d);
-        })
+        .style("stroke", d => getLineColor(d))
+        // PROTECT THE SELECTED LINE: Do not overwrite opacity/thickness if a point is actively selected
         .style("stroke-width", d => {
+            if (selectedPoint) return d.id === selectedPoint.id ? 4 : 1;
             return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
         })
         .style("opacity", d => {
+            if (selectedPoint) return d.id === selectedPoint.id ? 1 : 0.05;
             return (showAnon && d.is_anomaly && colorMode === 'original') ? 0.9 : 0.6;
         });
 }
@@ -1524,6 +1565,7 @@ function drawSankeyDiagram(selector, activeData) {
                 });
                 
             d3.selectAll(".pc-line:not(.filtered-out)")
+                .style("stroke", p => getLineColor(p))
                 .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
                 .style("stroke-width", p => linkPointIds.has(p.id) ? 2.5 : 1);
                 
@@ -1538,6 +1580,7 @@ function drawSankeyDiagram(selector, activeData) {
                 });
                 
             d3.selectAll(".dot:not(.filtered-out)").filter(p => linkPointIds.has(p.id)).raise();
+            d3.selectAll(".pc-line:not(.filtered-out)").filter(p => linkPointIds.has(p.id)).raise();
         })
         .append("title")
         .text(d => `${d.source.name} → ${d.target.name}\n${d.value} points${d.isDiscrepancy ? ' (DISCREPANCY)' : ''}`);
@@ -1590,7 +1633,13 @@ function drawParallelCoordinates(containerSelector) {
     svgRoot.on("click", () => {
         selectedPoint = null;
         brushedPointsGlobal = [];
-        d3.selectAll(".dot, .pc-line").style("opacity", 0.9);
+        d3.selectAll(".dot").style("opacity", 0.9);
+        
+        d3.selectAll(".pc-line")
+          .style("opacity", 0.6)
+          .style("stroke-width", 1.5)
+          .style("stroke", d => getLineColor(d));
+          
         d3.selectAll(".link-group line").remove();
         resetAllHovers();
         updateLiveAnalytics([]); 
@@ -1625,11 +1674,7 @@ function drawParallelCoordinates(containerSelector) {
         .attr("class", d => `pc-line pt-${d.id}`)
         .attr("d", path)
         .style("fill", "none")
-        .style("stroke", d => {
-            const showAnon = d3.select("#show-anomalies").property("checked");
-            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
-            return getColor(d);
-        })
+        .style("stroke", d => getLineColor(d))
         .style("stroke-width", d => {
             const showAnon = d3.select("#show-anomalies").property("checked");
             return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
@@ -1640,11 +1685,18 @@ function drawParallelCoordinates(containerSelector) {
         })
         .on("mouseover", function(event, d) {
             resetAllHovers();
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            
             d3.selectAll(`.dot.pt-${d.id}`)
               .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, true); })
               .style("stroke", "var(--hover-stroke)")
               .style("stroke-width", 2).raise();
-            d3.selectAll(`.pc-line.pt-${d.id}`).style("stroke-width", 3).raise();
+              
+            d3.selectAll(`.pc-line.pt-${d.id}`)
+              .style("opacity", 1)
+              .style("stroke", (showAnon && d.is_anomaly && colorMode === 'original') ? "var(--anomaly-hover)" : getLineColor(d))
+              .style("stroke-width", 4).raise();
+              
             showAttributeTooltip(event, d);
         })
         .on("mouseout", function() { resetAllHovers(); })
