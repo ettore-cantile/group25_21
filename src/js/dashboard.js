@@ -4,7 +4,7 @@ let metadata = {};
 let colorMode = 'original';
 let uniqueClasses = [];
 let pointById = new Map();
-let currentPointSize = 5;
+let currentPointSize = 3.5;
 let selectedPoint = null;
 let brushedPointsGlobal = []; 
 let kmeansProjectionSource = 'pca'; 
@@ -36,7 +36,6 @@ const redsDiscrete = ["#67000d", "#cb181d", "#fb6a4a", "#fcae91", "#fee5d9"];
 const colorRecall = d3.scaleQuantize().domain([0, 1]).range(redsDiscrete);
 const rdYlGnDiscrete = ["#d73027", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"];
 const colorFScore = d3.scaleQuantize().domain([0, 1]).range(rdYlGnDiscrete);
-const colorKMeans = d3.scaleOrdinal(d3.schemeCategory10);
 
 // Gauges
 const gauges = { precision: { foreground: null }, recall: { foreground: null }, fscore: { foreground: null } };
@@ -99,6 +98,7 @@ function initDashboard(folder) {
             return String(str).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         };
 
+        // CORE FIX: Apply formatLabel to ALL cluster attributes to ensure exact string matching with true labels
         data.points.forEach((p, i) => {
             if (csvData[i]) p.attributes = csvData[i];
 
@@ -106,15 +106,15 @@ function initDashboard(folder) {
             
             const kData = kmeansMap.get(p.id);
             if(kData) {
-                p.kmeans_cluster = kData.kmeans_cluster;
+                p.kmeans_cluster = formatLabel(kData.kmeans_cluster);
                 p.is_anomaly = kData.is_anomaly; 
             }
             
             const k2dData = kmeans2dMap.get(p.id);
             if(k2dData) {
-                p.pca_kmeans_cluster = k2dData.pca_kmeans_cluster;
+                p.pca_kmeans_cluster = formatLabel(k2dData.pca_kmeans_cluster);
                 p.pca_is_anomaly = k2dData.pca_is_anomaly;
-                p.mds_kmeans_cluster = k2dData.mds_kmeans_cluster;
+                p.mds_kmeans_cluster = formatLabel(k2dData.mds_kmeans_cluster);
                 p.mds_is_anomaly = k2dData.mds_is_anomaly;
             }
         });
@@ -126,7 +126,6 @@ function initDashboard(folder) {
         pointById = new Map(dataset.map(p => [p.id, p]));
 
         colorOriginal.domain(uniqueClasses);
-        colorKMeans.domain(uniqueClasses);
 
         radarMinMax = {};
         origClusterAvg = {};
@@ -186,13 +185,6 @@ function initDashboard(folder) {
         d3.selectAll(".tab-2d").classed("hidden-panel", false);
         document.body.clientWidth; 
 
-        const grid2d = d3.select("#plots-grid-2d");
-        if (grid2d.select("#comparison-plot-container").empty()) {
-            const newPlot = grid2d.append("div").attr("id", "comparison-plot-container").attr("class", "plot-container").style("grid-column", "1 / span 2");
-            newPlot.append("div").attr("class", "plot-title").text("Cluster Agreement Flow"); 
-            newPlot.append("div").attr("id", "comparison-plot").attr("class", "svg-container"); 
-        }
-
         drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D, d => {
             const showAnon = d3.select("#show-anomalies").property("checked");
             if (colorMode === 'original') return (showAnon && d.pca_is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
@@ -223,7 +215,7 @@ function initDashboard(folder) {
     });
 }
 
-// Initial Boot and Theme Init
+// Initial Boot, Theme Init and Resize Listener
 document.addEventListener("DOMContentLoaded", () => {
     initDashboard(currentDatasetName);
     initGauge("#gauge-precision", gauges.precision);
@@ -231,7 +223,6 @@ document.addEventListener("DOMContentLoaded", () => {
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
     
-    // Theme Toggle Initialization
     const themeToggle = document.getElementById('theme-toggle');
     if (themeToggle) {
         themeToggle.addEventListener('click', () => {
@@ -240,7 +231,70 @@ document.addEventListener("DOMContentLoaded", () => {
             document.documentElement.setAttribute('data-theme', newTheme);
         });
     }
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            refreshAllVisualizations();
+        }, 300);
+    });
 });
+
+// --- FULL REFRESH FUNCTION FOR DYNAMIC SIZING ---
+function refreshAllVisualizations() {
+    if (!dataset || dataset.length === 0) return;
+
+    brushPCA = d3.brush();
+    brushMDS = d3.brush();
+    brushKMeans = d3.brush();
+    brushPCA2D = d3.brush();
+    brushMDS2D = d3.brush();
+
+    const targetPlotsToClear = [
+        "#pca-plot", "#mds-plot", "#kmeans-plot", 
+        "#pca-plot-2d", "#mds-plot-2d", "#pc-plot"
+    ];
+    targetPlotsToClear.forEach(selector => d3.select(selector).html(""));
+
+    drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
+    drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
+    drawPlot("#kmeans-plot", kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x', kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y', "kmeans", brushKMeans, d => {
+        const showAnon = d3.select("#show-anomalies").property("checked");
+        if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
+        return getColor(d);
+    });
+    drawParallelCoordinates("#pc-plot");
+
+    drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D, d => {
+        const showAnon = d3.select("#show-anomalies").property("checked");
+        if (colorMode === 'original') return (showAnon && d.pca_is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
+        return getColor(d);
+    });
+    drawPlot("#mds-plot-2d", "mds_x", "mds_y", "mds2d", brushMDS2D, d => {
+        const showAnon = d3.select("#show-anomalies").property("checked");
+        if (colorMode === 'original') return (showAnon && d.mds_is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
+        return getColor(d);
+    });
+
+    setupBrushing();
+    applyFilters();
+
+    if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
+
+    if (selectedPoint) {
+        updateSelection(selectedPoint);
+    } else if (brushedPointsGlobal.length > 0) {
+        updateLiveAnalytics(brushedPointsGlobal);
+        dataset.forEach(d => {
+            const isSelected = brushedPointsGlobal.includes(d);
+            d3.selectAll(`.pt-${d.id}:not(.filtered-out)`).style("opacity", isSelected ? 0.9 : 0.15);
+        });
+    } else {
+        updateLiveAnalytics([]);
+    }
+}
+
 
 // --- GLOBAL EVENT LISTENERS ---
 d3.select("#dataset-selector").on("change", function() {
@@ -276,6 +330,17 @@ d3.select("#show-anomalies").on("change", function() {
 d3.selectAll("input[name='kmeansSource']").on("change", function() {
     kmeansProjectionSource = this.value;
     redrawKMeansPlot();
+});
+
+// Event listener for the Sankey Mode Segemented Control
+d3.selectAll("input[name='sankeyMode']").on("change", function() {
+    const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+    if (currentTab === '2d') {
+        const activeData = brushedPointsGlobal.length > 1 
+            ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall)
+            : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
+        drawSankeyDiagram("#comparison-plot", activeData);
+    }
 });
 
 d3.selectAll("input[name='mainTab']").on("change", function() {
@@ -367,18 +432,11 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
 
     svg.selectAll(".dot")
         .data(dataset)
-        .enter().append("circle")
+        .enter().append("path")
         .attr("class", d => `dot dot-${plotId} pt-${d.id}`)
-        .attr("cx", d => xScale(d[xKey]))
-        .attr("cy", d => yScale(d[yKey]))
-        .attr("r", d => {
-            const showAnon = d3.select("#show-anomalies").property("checked");
-            let isAnom = false;
-            if (plotId === 'pca2d') isAnom = d.pca_is_anomaly;
-            else if (plotId === 'mds2d') isAnom = d.mds_is_anomaly;
-            else if (plotId === 'kmeans') isAnom = d.is_anomaly;
-            
-            return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
+        .attr("transform", d => `translate(${xScale(d[xKey])},${yScale(d[yKey])})`)
+        .attr("d", function(d) {
+            return getSymbolPath(`dot dot-${plotId} pt-${d.id}`, d, false);
         })
         .style("fill", d => customColorFn ? customColorFn(d) : getColor(d))
         .style("stroke", "var(--dot-stroke)")
@@ -387,11 +445,18 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         .style("cursor", "pointer")
         .on("mouseover", function(event, d) {
             resetAllHovers();
+            const showAnon = d3.select("#show-anomalies").property("checked");
+            let isAnom = false;
+            if (plotId === 'pca2d') isAnom = d.pca_is_anomaly;
+            else if (plotId === 'mds2d') isAnom = d.mds_is_anomaly;
+            else if (plotId === 'kmeans') isAnom = d.is_anomaly;
+            
             d3.selectAll(`.dot.pt-${d.id}`)
-              .attr("r", currentPointSize * 2.0)
-              .style("stroke", "var(--hover-stroke)")
+              .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, true); })
+              .style("stroke", (showAnon && isAnom) ? "var(--anomaly-hover)" : "var(--hover-stroke)")
               .style("stroke-width", 2).raise();
             d3.selectAll(`.pc-line.pt-${d.id}`)
+              .style("stroke", (showAnon && d.is_anomaly && colorMode === 'original') ? "var(--anomaly-hover)" : null)
               .style("stroke-width", 3).raise();
             showTooltip(event, d);
         })
@@ -477,7 +542,7 @@ function toggleDiscrepancies(show) {
                 svgContainer.append("path")
                     .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
                     .attr("transform", `translate(${centroids[k].x}, ${centroids[k].y})`)
-                    .style("fill", colorKMeans(k))
+                    .style("fill", colorOriginal(k)) 
                     .style("stroke", "var(--sankey-node-stroke)") 
                     .style("stroke-width", 1.5);
             });
@@ -559,7 +624,6 @@ function updateConfusionMatrix(activePoints, tabMode) {
             if (matrix[trueL] && matrix[trueL][predL] !== undefined) matrix[trueL][predL]++;
         });
 
-        // Use CSS Variables for dynamic styling in matrix
         let html = `<h5 style='margin: 15px 0 5px 0; color: var(--text-title); border-bottom: 1px solid var(--border-color);'>${title}</h5>`;
         html += "<table style='border-collapse: collapse; width: 100%; text-align: center; font-size: 0.75rem; margin-bottom: 10px;'>";
         html += "<thead><tr><th style='border-bottom: 1px solid var(--border-color); color: var(--text-title);'>GT ↓ \\ KMeans →</th>";
@@ -615,15 +679,8 @@ function updateSelection(d) {
 
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.8 : 0.1))
-            .attr("r", function(p) {
-                if (p.id === d.id) return currentPointSize * 2.0; 
-                const showAnon = d3.select("#show-anomalies").property("checked");
-                const plotClass = d3.select(this).attr("class");
-                let isAnom = false;
-                if (plotClass.includes("pca2d")) isAnom = p.pca_is_anomaly;
-                else if (plotClass.includes("mds2d")) isAnom = p.mds_is_anomaly;
-                else if (plotClass.includes("kmeans")) isAnom = p.is_anomaly;
-                return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
+            .attr("d", function(p) {
+                return getSymbolPath(d3.select(this).attr("class"), p, p.id === d.id);
             })
             .style("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
@@ -655,15 +712,8 @@ function updateSelection(d) {
 
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : 0.1)
-            .attr("r", function(p) {
-                if (p.id === d.id) return currentPointSize * 2.0; 
-                const showAnon = d3.select("#show-anomalies").property("checked");
-                const plotClass = d3.select(this).attr("class");
-                let isAnom = false;
-                if (plotClass.includes("pca2d")) isAnom = p.pca_is_anomaly;
-                else if (plotClass.includes("mds2d")) isAnom = p.mds_is_anomaly;
-                else if (plotClass.includes("kmeans")) isAnom = p.is_anomaly;
-                return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
+            .attr("d", function(p) {
+                return getSymbolPath(d3.select(this).attr("class"), p, p.id === d.id);
             })
             .style("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
@@ -931,29 +981,40 @@ function drawRadarChart(point) {
 }
 
 // --- UTILITIES ---
-function resetAllHovers() {
-    const showAnon = d3.select("#show-anomalies").property("checked");
-    
-    const getBaseR = (nodeClass, d) => {
-        let isAnom = false;
-        if (nodeClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
-        else if (nodeClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
-        else if (nodeClass.includes("kmeans")) isAnom = d.is_anomaly;
-        return (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
-    };
 
+function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
+    const showAnon = d3.select("#show-anomalies").property("checked");
+    let isAnom = false;
+    
+    if (plotClass && plotClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
+    else if (plotClass && plotClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
+    else if (plotClass && plotClass.includes("kmeans")) isAnom = d.is_anomaly;
+    
+    let r = currentPointSize;
+    if (overrideR !== null) r = overrideR;
+    else if (isHovered) r = currentPointSize * 2.0; 
+    
+    const area = Math.PI * Math.pow(r, 2) * ((showAnon && isAnom) ? 1.5 : 1);
+    const type = (showAnon && isAnom) ? d3.symbolTriangle : d3.symbolCircle;
+    
+    return d3.symbol().type(type).size(area)();
+}
+
+function resetAllHovers() {
     if (selectedPoint) {
         d3.selectAll(".dot")
-            .attr("r", function(p) { return p.id === selectedPoint.id ? currentPointSize * 2.0 : getBaseR(d3.select(this).attr("class"), p); })
+            .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, p.id === selectedPoint.id); })
             .style("stroke", p => p.id === selectedPoint.id ? "var(--hover-stroke)" : "var(--dot-stroke)")
             .style("stroke-width", p => p.id === selectedPoint.id ? 2 : 0.8);
         d3.selectAll(".pc-line")
             .style("stroke-width", p => p.id === selectedPoint.id ? 3 : 1.5);
     } else {
         d3.selectAll(".dot")
-            .attr("r", function(p) { return getBaseR(d3.select(this).attr("class"), p); })
+            .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, false); })
             .style("stroke", "var(--dot-stroke)")
             .style("stroke-width", 0.8);
+        
+        const showAnon = d3.select("#show-anomalies").property("checked");
         d3.selectAll(".pc-line")
             .style("stroke-width", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5)
             .style("opacity", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6);
@@ -1000,36 +1061,22 @@ function getColor(d) {
 
 function updateColors() {
     const showAnon = d3.select("#show-anomalies").property("checked");
-    const getRadius = (isAnom) => (showAnon && isAnom) ? currentPointSize * 1.8 : currentPointSize;
 
-    d3.selectAll(".dot.dot-pca").transition().duration(500)
-        .style("fill", d => getColor(d))
-        .attr("r", currentPointSize);
+    d3.selectAll(".dot").transition().duration(500)
+        .style("fill", function(d) {
+            const plotClass = d3.select(this).attr("class");
+            let isAnom = false;
+            
+            if (plotClass && plotClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
+            else if (plotClass && plotClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
+            else if (plotClass && plotClass.includes("kmeans")) isAnom = d.is_anomaly;
 
-    d3.selectAll(".dot.dot-mds").transition().duration(500)
-        .style("fill", d => getColor(d))
-        .attr("r", currentPointSize);
-    
-    d3.selectAll(".dot.dot-pca2d").transition().duration(500)
-        .style("fill", d => {
-            if (colorMode === 'original') return (showAnon && d.pca_is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
+            if (colorMode === 'original') return (showAnon && isAnom) ? 'var(--anomaly-color)' : colorOriginal(d.label);
             return getColor(d);
         })
-        .attr("r", d => getRadius(d.pca_is_anomaly));
-    
-    d3.selectAll(".dot.dot-mds2d").transition().duration(500)
-        .style("fill", d => {
-            if (colorMode === 'original') return (showAnon && d.mds_is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
-            return getColor(d);
-        })
-        .attr("r", d => getRadius(d.mds_is_anomaly));
-    
-    d3.selectAll(".dot.dot-kmeans").transition().duration(500)
-        .style("fill", d => {
-            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
-            return getColor(d);
-        })
-        .attr("r", d => getRadius(d.is_anomaly));
+        .attr("d", function(d) {
+            return getSymbolPath(d3.select(this).attr("class"), d, (selectedPoint && selectedPoint.id === d.id));
+        });
     
     d3.selectAll(".pc-line").transition().duration(500)
         .style("stroke", d => {
@@ -1258,6 +1305,7 @@ function drag(simulation, centerNode, size) {
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
 }
 
+// --- DYNAMIC SANKEY GENERATION ---
 function drawSankeyDiagram(selector, activeData) {
     const container = d3.select(selector);
     if (container.empty()) return;
@@ -1275,7 +1323,6 @@ function drawSankeyDiagram(selector, activeData) {
 
     const width = container.node().clientWidth;
     const height = container.node().clientHeight;
-    
     const margin = { top: 15, right: 40, bottom: 50, left: 40 };
 
     const svg = container.append("svg")
@@ -1285,34 +1332,59 @@ function drawSankeyDiagram(selector, activeData) {
         .append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    const pcaClusters = Array.from(new Set(activeData.map(d => String(d.pca_kmeans_cluster)).filter(c => c !== "undefined"))).sort();
-    const mdsClusters = Array.from(new Set(activeData.map(d => String(d.mds_kmeans_cluster)).filter(c => c !== "undefined"))).sort();
+    const sankeyMode = d3.select("input[name='sankeyMode']:checked").node().value;
+    
+    let sourceKey, targetKey, sourcePrefix, targetPrefix, isDiscrepancyFn;
 
-    if (pcaClusters.length === 0 || mdsClusters.length === 0) return;
+    if (sankeyMode === 'pca-mds') {
+        sourceKey = 'pca_kmeans_cluster';
+        targetKey = 'mds_kmeans_cluster';
+        sourcePrefix = 'PCA '; // Pulito, senza la 'C'
+        targetPrefix = 'MDS ';
+        isDiscrepancyFn = (d) => String(d.pca_kmeans_cluster) !== String(d.mds_kmeans_cluster);
+    } else if (sankeyMode === 'gt-pca') {
+        sourceKey = 'label';
+        targetKey = 'pca_kmeans_cluster';
+        sourcePrefix = 'GT ';
+        targetPrefix = 'PCA ';
+        isDiscrepancyFn = (d) => d.pca_is_anomaly;
+    } else if (sankeyMode === 'gt-mds') {
+        sourceKey = 'label';
+        targetKey = 'mds_kmeans_cluster';
+        sourcePrefix = 'GT ';
+        targetPrefix = 'MDS ';
+        isDiscrepancyFn = (d) => d.mds_is_anomaly;
+    }
+
+    const sourceClusters = Array.from(new Set(activeData.map(d => String(d[sourceKey])).filter(c => c !== "undefined"))).sort();
+    const targetClusters = Array.from(new Set(activeData.map(d => String(d[targetKey])).filter(c => c !== "undefined"))).sort();
+
+    if (sourceClusters.length === 0 || targetClusters.length === 0) return;
 
     const nodes = [];
     const nodeMap = new Map();
     let nodeIndex = 0;
 
-    pcaClusters.forEach(c => {
-        const name = `PCA C${c}`;
-        nodes.push({ name: name, type: 'pca', cluster: c });
+    sourceClusters.forEach(c => {
+        const name = `${sourcePrefix}${c}`;
+        nodes.push({ name: name, type: 'source', cluster: c, isGT: sourceKey === 'label' });
         nodeMap.set(name, nodeIndex++);
     });
-    mdsClusters.forEach(c => {
-        const name = `MDS C${c}`;
-        nodes.push({ name: name, type: 'mds', cluster: c });
+    
+    targetClusters.forEach(c => {
+        const name = `${targetPrefix}${c}`;
+        nodes.push({ name: name, type: 'target', cluster: c, isGT: targetKey === 'label' });
         nodeMap.set(name, nodeIndex++);
     });
 
     const linkMap = new Map();
     activeData.forEach(d => {
-        if (d.pca_kmeans_cluster !== undefined && d.mds_kmeans_cluster !== undefined) {
-            const sourceName = `PCA C${d.pca_kmeans_cluster}`;
-            const targetName = `MDS C${d.mds_kmeans_cluster}`;
+        if (d[sourceKey] !== undefined && d[targetKey] !== undefined) {
+            const sourceName = `${sourcePrefix}${d[sourceKey]}`;
+            const targetName = `${targetPrefix}${d[targetKey]}`;
             const key = `${sourceName}->${targetName}`;
             
-            const isDiscrepancy = String(d.pca_kmeans_cluster) !== String(d.mds_kmeans_cluster);
+            const isDiscrepancy = isDiscrepancyFn(d);
             
             if (!linkMap.has(key)) {
                 linkMap.set(key, { 
@@ -1329,7 +1401,6 @@ function drawSankeyDiagram(selector, activeData) {
     });
 
     const links = Array.from(linkMap.values());
-
     const maxDiscrepancy = d3.max(links.filter(l => l.isDiscrepancy), d => d.value) || 1;
     
     const baseColors = ["#fcae91", "#fb6a4a", "#ef3b2c", "#cb181d", "#99000d"];
@@ -1447,7 +1518,11 @@ function drawSankeyDiagram(selector, activeData) {
             
             d3.selectAll(".dot:not(.filtered-out)")
                 .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
-                .attr("r", p => linkPointIds.has(p.id) ? currentPointSize * 1.5 : currentPointSize);
+                .attr("d", function(p) {
+                    const plotClass = d3.select(this).attr("class");
+                    const overrideR = linkPointIds.has(p.id) ? currentPointSize * 1.5 : currentPointSize;
+                    return getSymbolPath(plotClass, p, false, overrideR);
+                });
                 
             d3.selectAll(".pc-line:not(.filtered-out)")
                 .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
@@ -1476,7 +1551,7 @@ function drawSankeyDiagram(selector, activeData) {
         .attr("y", d => d.y0)
         .attr("height", d => Math.max(1, d.y1 - d.y0))
         .attr("width", d => d.x1 - d.x0)
-        .style("fill", d => colorKMeans(d.cluster))
+        .style("fill", d => colorOriginal(d.cluster)) 
         .style("stroke", "var(--sankey-node-stroke)") 
         .attr("class", "sankey-node")
         .append("title")
@@ -1567,7 +1642,7 @@ function drawParallelCoordinates(containerSelector) {
         .on("mouseover", function(event, d) {
             resetAllHovers();
             d3.selectAll(`.dot.pt-${d.id}`)
-              .attr("r", currentPointSize * 2.0)
+              .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, true); })
               .style("stroke", "var(--hover-stroke)")
               .style("stroke-width", 2).raise();
             d3.selectAll(`.pc-line.pt-${d.id}`).style("stroke-width", 3).raise();

@@ -19,6 +19,12 @@
             </div>
             
             <div style="display: flex; align-items: center; gap: 15px;">
+                <select id="dataset-selector" class="dataset-select" style="padding: 4px 8px; border-radius: 4px; background: var(--control-bg); color: var(--text-main); border: 1px solid var(--border-color); font-weight: bold; outline: none; cursor: pointer;">
+                    <option value="wine" selected>Wine Quality</option>
+                    <option value="iris">Iris Flowers</option>
+                    <option value="user_knowledge">User Knowledge</option>
+                </select>
+
                 <button id="theme-toggle" class="theme-toggle" aria-label="Toggle Theme">
                     <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="5"></circle>
@@ -49,8 +55,7 @@
             <div class="controls-left">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span class="control-label"><strong>Metrics:</strong></span>
-                    <div class="control-group">
-                        </div>
+                    <div class="control-group"></div>
                 </div>
 
                 <div class="divider"></div>
@@ -125,7 +130,6 @@
         </div>
 
         <div class="plot-container tab-content tab-nd" id="pc-panel">
-            <div class="plot-title">Parallel Coordinates (Original Attributes)</div>
             <div id="pc-plot" class="svg-container"></div>
         </div>
 
@@ -138,9 +142,20 @@
                 <div class="plot-title">Euclidean MDS Projection (2D)</div>
                 <div id="mds-plot-2d" class="svg-container"></div>
             </div>
-            <div class="plot-container" id="comparison-plot-container" style="grid-column: 1 / span 2;">
-                <div class="plot-title">Cluster Agreement Flow (PCA 2D vs MDS 2D)</div>
-                <div id="comparison-plot" class="svg-container"></div>
+            
+            <div class="plot-container" id="comparison-plot-container" style="grid-column: 1 / span 2; display: flex; flex-direction: column;">
+                <div class="plot-title" style="position: relative; display: flex; justify-content: center; align-items: center; padding: 4px 15px; min-height: 32px;">
+                    <span>Cluster Agreement Flow</span>
+                    <div class="segmented-control" style="position: absolute; right: 15px; font-size: 0.65rem; margin: 0;">
+                        <input type="radio" id="sankey-gt-pca" name="sankeyMode" value="gt-pca">
+                        <label for="sankey-gt-pca">Label vs PCA</label>
+                        <input type="radio" id="sankey-gt-mds" name="sankeyMode" value="gt-mds">
+                        <label for="sankey-gt-mds">Label vs MDS</label>
+                        <input type="radio" id="sankey-pca-mds" name="sankeyMode" value="pca-mds" checked>
+                        <label for="sankey-pca-mds">PCA vs MDS</label>
+                    </div>
+                </div>
+                <div id="comparison-plot" class="svg-container" style="flex: 1; width: 100%; height: 100%; min-height: 0;"></div>
             </div>
         </div>
 
@@ -149,14 +164,37 @@
             <div class="svg-container" id="dynamic-svg-box" style="padding: 10px; width: 100%; height: 100%; overflow-y: auto;">
                 
                 <div id="empty-state-placeholder" class="dynamic-content-wrapper">
-                    <div class="placeholder-content">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="placeholder-content" style="padding: 10px; gap: 8px; margin-bottom: 25px; border-bottom: 1px solid var(--border-color); width: 85%; padding-bottom: 20px;">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 5px;">
                             <circle cx="12" cy="12" r="10"></circle>
                             <line x1="12" y1="8" x2="12" y2="12"></line>
                             <line x1="12" y1="16" x2="12.01" y2="16"></line>
                         </svg>
-                        <p>No Points Selected</p>
-                        <span>Hover, click, or brush on the scatterplots to analyze local quality and relationships.</span>
+                        <p style="font-size: 1.1rem;">Global Overview</p>
+                        <span style="font-size: 0.8rem;">Select points to analyze local metrics.</span>
+                    </div>
+
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; padding: 0 15px;">
+                        <div class="global-stat-card">
+                            <h4>PCA Trust</h4>
+                            <p class="val" id="fb-pca-trust">-</p>
+                        </div>
+                        <div class="global-stat-card">
+                            <h4>PCA Cont</h4>
+                            <p class="val" id="fb-pca-cont">-</p>
+                        </div>
+                        <div class="global-stat-card">
+                            <h4>MDS Trust</h4>
+                            <p class="val" id="fb-mds-trust">-</p>
+                        </div>
+                        <div class="global-stat-card">
+                            <h4>MDS Cont</h4>
+                            <p class="val" id="fb-mds-cont">-</p>
+                        </div>
+                        <div class="global-stat-card" style="flex: 1 1 100%; border-color: var(--fb-accent); background: transparent; padding: 10px;">
+                            <h4 style="color: var(--fb-accent);">Relationship Match</h4>
+                            <p class="val" id="fb-global-fscore" style="font-size: 1.6rem; color: var(--fb-accent); margin-top: 4px;">-</p>
+                        </div>
                     </div>
                 </div>
 
@@ -219,21 +257,6 @@
             </div>
         </div>
 
-        <footer class="footer-stats" id="global-footer">
-            <div class="footer-btn">
-                <div class="fb-label">Select Dataset</div>
-                <select id="dataset-selector" style="text-align: center;" class="dataset-select">
-                    <option value="wine" selected>Wine Quality</option>
-                    <option value="iris">Iris Flowers</option>
-                    <option value="user_knowledge">User Knowledge</option>
-                </select>
-            </div>
-            <div class="footer-btn"><div class="fb-label">PCA Trustworthiness</div><div class="fb-value" id="fb-pca-trust">-</div></div>
-            <div class="footer-btn"><div class="fb-label">PCA Continuity</div><div class="fb-value" id="fb-pca-cont">-</div></div>
-            <div class="footer-btn"><div class="fb-label">MDS Trustworthiness</div><div class="fb-value" id="fb-mds-trust">-</div></div>
-            <div class="footer-btn"><div class="fb-label">MDS Continuity</div><div class="fb-value" id="fb-mds-cont">-</div></div>
-            <div class="footer-btn"><div class="fb-label">Relationship Matching</div><div class="fb-value" id="fb-global-fscore">-</div></div>
-        </footer>
     </div>
 
     <div id="tooltip"></div>
