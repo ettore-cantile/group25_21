@@ -2,33 +2,20 @@
     "metadata": {
         "dataset": "wine.csv",
         "k_neighbors": 15,
-        "min_mismatch_pct": 0.8,
+        "min_mismatch_pct": 0.85,
         "total_samples": 178,
-        "num_fp_points_pca": 12,
-        "num_fp_points_mds": 14
+        "num_fp_points_pca": 3,
+        "num_fp_points_mds": 10
     },
     "false_positive_points_pca": [
         19,
-        28,
-        39,
-        43,
-        62,
         69,
-        72,
-        73,
-        78,
-        79,
-        112,
-        121
+        73
     ],
     "false_positive_points_mds": [
         19,
         25,
         39,
-        43,
-        59,
-        66,
-        68,
         69,
         71,
         73,
