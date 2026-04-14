@@ -828,11 +828,13 @@ function updateLiveAnalytics(selectedPoints) {
         return;
     }
     
-    d3.select("#dynamic-panel-title").text("Selection Metrics");
-    d3.select("#empty-state-placeholder").classed("hidden-panel", true);
-    d3.select("#neighbor-graph-container").classed("hidden-panel", true);
-    d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-    d3.select("#gauges-container").classed("hidden-panel", false);
+    if (!selectedPoint) {
+        d3.select("#dynamic-panel-title").text("Selection Metrics");
+        d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+        d3.select("#neighbor-graph-container").classed("hidden-panel", true);
+        d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+        d3.select("#gauges-container").classed("hidden-panel", false);
+    }
 
     d3.select("#stat-count").text(selectedPoints.length);
     d3.selectAll(".gauges-wrapper").style("display", "flex");
