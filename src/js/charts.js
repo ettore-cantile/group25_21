@@ -1,6 +1,6 @@
 // --- D3 VISUALIZATION DRAWING FUNCTIONS ---
 
-// Function to draw a 2D scatter plot using D3 and attach interactions
+// Function to draw a 2D scatter plot using D3, attaching Brush, Zoom and Pan interactions
 function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn = null) {
     const container = d3.select(containerSelector); 
     const width = container.node().clientWidth || 400; 
@@ -13,7 +13,10 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         .style("height", "100%");
 
     svgRoot.on("mouseleave", resetAllHovers);
-    svgRoot.on("click", () => {
+    
+    // Reset selection on background click (ignoring drag events)
+    svgRoot.on("click", (event) => {
+        if (event.defaultPrevented) return; // Prevent triggering if it was a pan/drag
         selectedPoint = null;
         brushedPointsGlobal = [];
         d3.selectAll(".dot").style("opacity", 0.9);
@@ -35,22 +38,54 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
     const innerWidth = Math.max(10, width - margin.left - margin.right);
     const innerHeight = Math.max(10, height - margin.top - margin.bottom);
 
+    // --- ZOOM PADDING FIX ---
+    // Calculate extents and add 5% padding so edge points are not cut off by the clip-path
+    const xExtent = d3.extent(dataset, d => d[xKey]);
+    const yExtent = d3.extent(dataset, d => d[yKey]);
+    const xPadding = xExtent[0] === xExtent[1] ? 1 : (xExtent[1] - xExtent[0]) * 0.05;
+    const yPadding = yExtent[0] === yExtent[1] ? 1 : (yExtent[1] - yExtent[0]) * 0.05;
+
+    // Create base scales with padded domains
+    const xScale = d3.scaleLinear().domain([xExtent[0] - xPadding, xExtent[1] + xPadding]).nice().range([0, innerWidth]);
+    const yScale = d3.scaleLinear().domain([yExtent[0] - yPadding, yExtent[1] + yPadding]).nice().range([innerHeight, 0]);
+
+    // Store both base and current scales for semantic zooming support
+    scalesMap[plotId] = { xScale, yScale, currentXScale: xScale, currentYScale: yScale, xKey, yKey };
+    brushObj.xScale = xScale;
+    brushObj.yScale = yScale;
+
+    // Define a clip path to prevent points from rendering outside the axes bounds when zoomed
+    svgRoot.append("defs").append("clipPath")
+        .attr("id", `clip-${plotId}`)
+        .append("rect")
+        .attr("width", innerWidth)
+        .attr("height", innerHeight);
+
     const svg = svgRoot.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    const xScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[xKey])).nice().range([0, innerWidth]);
-    const yScale = d3.scaleLinear().domain(d3.extent(dataset, d => d[yKey])).nice().range([innerHeight, 0]);
+    // Draw static axes wrappers
+    const xAxisGroup = svg.append("g").attr("class", "x-axis").attr("transform", `translate(0,${innerHeight})`).call(d3.axisBottom(xScale).ticks(5));
+    const yAxisGroup = svg.append("g").attr("class", "y-axis").call(d3.axisLeft(yScale).ticks(5));
 
-    scalesMap[plotId] = { xScale, yScale, xKey, yKey };
+    // Create a zoomable view group with the clip path applied
+    const view = svg.append("g").attr("clip-path", `url(#clip-${plotId})`);
 
-    svg.append("g").attr("transform", `translate(0,${innerHeight})`).call(d3.axisBottom(xScale).ticks(5));
-    svg.append("g").call(d3.axisLeft(yScale).ticks(5));
+    // Layer ordering is critical: Centroids/Links -> Brush Overlay -> Dots (Dots must be top for hover tooltips)
+    const centroidLayer = view.append("g").attr("class", "centroid-layer");
+    const linkGroup = view.append("g").attr("class", "link-group");
+    const brushGroup = view.append("g").attr("class", "brush-group");
+    const dotsGroup = view.append("g").attr("class", "dots-group");
 
-    svg.append("g").attr("class", "centroid-layer");
-    svg.append("g").attr("class", "link-group");
-    const brushGroup = svg.append("g").attr("class", "brush-group");
+    // Initialize Brush limits and logic
+    brushObj.extent([[0, 0], [innerWidth, innerHeight]]);
+    
+    // Restrict brushing to Left Click ONLY, leaving Alt or Middle Click available for Pan
+    brushObj.filter(event => !event.ctrlKey && !event.button && !event.altKey);
+    brushGroup.call(brushObj);
 
-    svg.selectAll(".dot")
+    // Draw Data Points
+    dotsGroup.selectAll(".dot")
         .data(dataset)
         .enter().append("path")
         .attr("class", d => `dot dot-${plotId} pt-${d.id}`)
@@ -90,10 +125,66 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
             updateSelection(d);
         });
 
-    brushObj.extent([[0, 0], [innerWidth, innerHeight]]);
-    brushGroup.call(brushObj);
-    brushObj.xScale = xScale;
-    brushObj.yScale = yScale;
+    // Semantic Zoom & Pan Configuration
+    const zoom = d3.zoom()
+        .scaleExtent([0.5, 20])
+        .extent([[0, 0], [innerWidth, innerHeight]])
+        .filter(event => {
+            if (event.type === 'wheel') return true; // Allow scroll wheel
+            if (event.type === 'mousedown' && (event.altKey || event.button === 1)) return true; // Allow Alt+Click or Middle Click for Panning
+            if (event.type === 'dblclick') return true; // Allow Double Click reset
+            return false;
+        })
+        .on("zoom", (event) => {
+            const transform = event.transform;
+            
+            // Rescale axes dynamically
+            const newX = transform.rescaleX(xScale);
+            const newY = transform.rescaleY(yScale);
+
+            // Update maps to ensure brush and external functions use zoomed coordinates
+            scalesMap[plotId].currentXScale = newX;
+            scalesMap[plotId].currentYScale = newY;
+            brushObj.xScale = newX;
+            brushObj.yScale = newY;
+
+            xAxisGroup.call(d3.axisBottom(newX).ticks(5));
+            yAxisGroup.call(d3.axisLeft(newY).ticks(5));
+
+            // Move points fluidly without scaling their radius/stroke width
+            dotsGroup.selectAll(".dot")
+                .attr("transform", d => `translate(${newX(d[xKey])},${newY(d[yKey])})`);
+
+            // Update discrepancy lines if active
+            centroidLayer.selectAll(".centroid-link")
+                .attr("x1", data => newX(data.d[xKey]))
+                .attr("y1", data => newY(data.d[yKey]))
+                .attr("x2", data => newX(data.c.x))
+                .attr("y2", data => newY(data.c.y));
+
+            // Update cross icons for centroids
+            centroidLayer.selectAll(".centroid-cross")
+                .attr("transform", c => `translate(${newX(c.x)}, ${newY(c.y)})`);
+
+            // Update neighbor graph connections
+            linkGroup.selectAll("line")
+                .attr("x1", data => newX(data.source[xKey]))
+                .attr("y1", data => newY(data.source[yKey]))
+                .attr("x2", data => newX(data.target[xKey]))
+                .attr("y2", data => newY(data.target[yKey]));
+
+            // Clear visual brush selection box when zooming/panning to prevent visual drift artifacts
+            if (event.sourceEvent && event.sourceEvent.type !== 'zoom') {
+                d3.select(`${containerSelector} .brush-group`).call(brushObj.move, null);
+            }
+        });
+
+    svgRoot.call(zoom);
+
+    // Reset zoom on double click
+    svgRoot.on("dblclick.zoom", () => {
+        svgRoot.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
+    });
 }
 
 // Function to draw neighbor connections between selected data points
@@ -102,21 +193,20 @@ function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
     const linkGroup = d3.select(`${plotMapping[plotId]} .link-group`);
     linkGroup.selectAll("line").remove(); 
 
-    const sourceX = scalesMap[plotId].xScale(sourceD[xKey]);
-    const sourceY = scalesMap[plotId].yScale(sourceD[yKey]);
-
     const linesData = neighborIds.map(id => pointById.get(id)).filter(p => p && p.precision >= minPrecision && p.recall >= minRecall);
 
+    // Target elements explicitly map source & target data to support dynamic semantic zooming
     linkGroup.selectAll("line")
         .data(linesData)
         .enter().append("line")
-        .attr("x1", sourceX)
-        .attr("y1", sourceY)
-        .attr("x2", target => scalesMap[plotId].xScale(target[xKey]))
-        .attr("y2", target => scalesMap[plotId].yScale(target[yKey]))
+        .attr("x1", scalesMap[plotId].currentXScale(sourceD[xKey]))
+        .attr("y1", scalesMap[plotId].currentYScale(sourceD[yKey]))
+        .attr("x2", target => scalesMap[plotId].currentXScale(target[xKey]))
+        .attr("y2", target => scalesMap[plotId].currentYScale(target[yKey]))
         .style("stroke", target => target.label === sourceD.label ? "#2ca02c" : "var(--anomaly-color)") 
         .style("stroke-width", 1.5)
-        .style("opacity", 0.6);
+        .style("opacity", 0.6)
+        .datum(target => ({ source: sourceD, target: target })); // Bind both points for zooming calculations
 }
 
 // Function to draw parallel coordinates mapping multi-dimensional data

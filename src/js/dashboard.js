@@ -465,6 +465,28 @@ function applyFilters() {
     const hideFpPca = d3.select("#hide-fp-pca").property("checked");
     const hideFpMds = d3.select("#hide-fp-mds").property("checked");
 
+    // --- DYNAMIC FP COUNT IN CHECKBOX LABELS ---
+    // Calculate ONLY the FPs that are currently active (not already hidden by Precision/Recall sliders)
+    const countFpPca = dataset.filter(d => d.is_fp_pca && d.precision >= minPrecision && d.recall >= minRecall).length;
+    const countFpMds = dataset.filter(d => d.is_fp_mds && d.precision >= minPrecision && d.recall >= minRecall).length;
+
+    // Update PCA Label dynamically
+    const labelPca = d3.select("label[for='hide-fp-pca']");
+    if (!labelPca.empty()) {
+        // Strip any existing count like "(12)" from the base text
+        const baseText = labelPca.text().replace(/\s*\(\d+\)$/, "");
+        labelPca.text(hideFpPca ? `${baseText} (${countFpPca})` : baseText);
+    }
+
+    // Update MDS Label dynamically
+    const labelMds = d3.select("label[for='hide-fp-mds']");
+    if (!labelMds.empty()) {
+        // Strip any existing count like "(12)" from the base text
+        const baseText = labelMds.text().replace(/\s*\(\d+\)$/, "");
+        labelMds.text(hideFpMds ? `${baseText} (${countFpMds})` : baseText);
+    }
+
+    // Apply visual filtering
     d3.selectAll(".dot, .pc-line").each(function(d) {
         const self = d3.select(this);
         let isFilteredOut = (d.precision < minPrecision || d.recall < minRecall);
@@ -516,10 +538,11 @@ function toggleDiscrepancies(show) {
             const centroids = {};
             validKMeansClusters.forEach(k => centroids[k] = {x:0, y:0, count:0});
 
+            // Calculate centroids purely in raw logical data space to support semantic panning/zooming mathematically
             dataset.forEach(d => {
                 if(d.precision >= minPrecision && d.recall >= minRecall && d[clusterProp] !== undefined) {
-                    centroids[d[clusterProp]].x += scales.xScale(d[scales.xKey]);
-                    centroids[d[clusterProp]].y += scales.yScale(d[scales.yKey]);
+                    centroids[d[clusterProp]].x += d[scales.xKey];
+                    centroids[d[clusterProp]].y += d[scales.yKey];
                     centroids[d[clusterProp]].count += 1;
                 }
             });
@@ -535,20 +558,24 @@ function toggleDiscrepancies(show) {
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
                 
+                // Use dynamically tracked current scales instead of static bounds
                 svgContainer.append("line")
-                    .attr("x1", scales.xScale(d[scales.xKey])).attr("y1", scales.yScale(d[scales.yKey]))
-                    .attr("x2", centroids[d[clusterProp]].x).attr("y2", centroids[d[clusterProp]].y)
-                    .attr("class", (d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct") + ` pt-${d.id}`);
+                    .attr("x1", scales.currentXScale(d[scales.xKey])).attr("y1", scales.currentYScale(d[scales.yKey]))
+                    .attr("x2", scales.currentXScale(centroids[d[clusterProp]].x)).attr("y2", scales.currentYScale(centroids[d[clusterProp]].y))
+                    .attr("class", (d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct") + ` pt-${d.id}`)
+                    .datum({ d: d, c: centroids[d[clusterProp]] }); // Bind datum locally to keep zooms 60fps
             });
 
             validKMeansClusters.forEach(k => {
                 if(centroids[k].count === 0) return;
                 svgContainer.append("path")
+                    .attr("class", "centroid-cross")
                     .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
-                    .attr("transform", `translate(${centroids[k].x}, ${centroids[k].y})`)
+                    .attr("transform", `translate(${scales.currentXScale(centroids[k].x)}, ${scales.currentYScale(centroids[k].y)})`)
                     .style("fill", colorOriginal(k)) 
                     .style("stroke", "var(--sankey-node-stroke)") 
-                    .style("stroke-width", 1.5);
+                    .style("stroke-width", 1.5)
+                    .datum(centroids[k]); // Bind logical coordinates for robust zooming targeting
             });
         });
 
