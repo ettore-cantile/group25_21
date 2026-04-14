@@ -14,14 +14,14 @@
     <div id="app-grid">
         <header class="header">
             <div>
-                <h1>Dimensionality Reduction Quality</h1>
+                <h1 style="display: flex; align-items: center;">Dimensionality Reduction Quality</h1>
                 <p class="subtitle">Comparing PCA and Euclidean MDS via Relationship Metrics</p>
             </div>
             
             <div style="display: flex; align-items: center; gap: 15px;">
-                <select id="dataset-selector" class="dataset-select" style="padding: 4px 8px; border-radius: 4px; background: var(--control-bg); color: var(--text-main); border: 1px solid var(--border-color); font-weight: bold; outline: none; cursor: pointer;">
-                    <option value="wine" selected>Wine Quality</option>
-                    <option value="iris">Iris Flowers</option>
+                <select id="dataset-selector" class="dataset-title-select">
+                    <option value="wine" selected>Wine</option>
+                    <option value="iris">Iris</option>
                     <option value="user_knowledge">User Knowledge</option>
                 </select>
 
@@ -144,13 +144,13 @@
             </div>
             
             <div class="plot-container" id="comparison-plot-container" style="grid-column: 1 / span 2; display: flex; flex-direction: column;">
-                <div class="plot-title" style="position: relative; display: flex; justify-content: center; align-items: center; padding: 4px 15px; min-height: 32px;">
+                <div class="plot-title" style="position: relative; display: flex; justify-content: center; align-items: center; padding: 4px 15px; min-height: 40px;">
                     <span>Cluster Agreement Flow</span>
-                    <div class="segmented-control" style="position: absolute; right: 15px; font-size: 0.65rem; margin: 0;">
+                    <div class="segmented-control" style="position: absolute; right: 15px; font-size: 0.65rem; margin: 8px 0;">
                         <input type="radio" id="sankey-gt-pca" name="sankeyMode" value="gt-pca">
-                        <label for="sankey-gt-pca">Label vs PCA</label>
+                        <label for="sankey-gt-pca">GT vs PCA</label>
                         <input type="radio" id="sankey-gt-mds" name="sankeyMode" value="gt-mds">
-                        <label for="sankey-gt-mds">Label vs MDS</label>
+                        <label for="sankey-gt-mds">GT vs MDS</label>
                         <input type="radio" id="sankey-pca-mds" name="sankeyMode" value="pca-mds" checked>
                         <label for="sankey-pca-mds">PCA vs MDS</label>
                     </div>
@@ -161,51 +161,55 @@
 
         <div class="plot-container" id="panel-dynamic">
             <div class="plot-title" id="dynamic-panel-title">Live Analytics</div>
-            <div class="svg-container" id="dynamic-svg-box" style="padding: 10px; width: 100%; height: 100%; overflow-y: auto;">
+            <div class="svg-container" id="dynamic-svg-box" style="padding: 10px; width: 100%; height: 100%; overflow-y: auto; display: flex; justify-content: center;">
                 
-                <div id="empty-state-placeholder" class="dynamic-content-wrapper">
-                    <div class="placeholder-content" style="padding: 10px; gap: 8px; margin-bottom: 25px; border-bottom: 1px solid var(--border-color); width: 85%; padding-bottom: 20px;">
-                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 5px;">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                        <p style="font-size: 1.1rem;">Global Overview</p>
-                        <span style="font-size: 0.8rem;">Select points to analyze local metrics.</span>
-                    </div>
+                <div id="empty-state-placeholder" class="dynamic-content-wrapper" style="height: 100%; justify-content: center;">
+                    <div style="width: 85%; max-width: 420px; display: flex; flex-direction: column; margin: auto; height: 100%; justify-content: center; min-height: 0;">
+                        
+                        <div class="global-overview-header">
+                            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                            <p>Global Overview</p>
+                            <span>Select points to analyze local metrics.</span>
+                        </div>
 
-                    <div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; width: 100%; padding: 0 15px;">
-                        <div class="global-stat-card">
-                            <h4>PCA Trust</h4>
-                            <p class="val" id="fb-pca-trust">-</p>
+                        <div class="global-stats-grid">
+                            <div class="global-stat-card">
+                                <h4>PCA Trustworthiness</h4>
+                                <p class="val" id="fb-pca-trust">-</p>
+                            </div>
+                            <div class="global-stat-card">
+                                <h4>PCA Continuity</h4>
+                                <p class="val" id="fb-pca-cont">-</p>
+                            </div>
+                            <div class="global-stat-card">
+                                <h4>MDS Trustworthiness</h4>
+                                <p class="val" id="fb-mds-trust">-</p>
+                            </div>
+                            <div class="global-stat-card">
+                                <h4>MDS Continuity</h4>
+                                <p class="val" id="fb-mds-cont">-</p>
+                            </div>
+                            <div class="global-stat-card rm-card">
+                                <h4 style="color: var(--fb-accent);">Relationship Match</h4>
+                                <p class="val" id="fb-global-fscore" style="color: var(--fb-accent);">-</p>
+                            </div>
                         </div>
-                        <div class="global-stat-card">
-                            <h4>PCA Cont</h4>
-                            <p class="val" id="fb-pca-cont">-</p>
-                        </div>
-                        <div class="global-stat-card">
-                            <h4>MDS Trust</h4>
-                            <p class="val" id="fb-mds-trust">-</p>
-                        </div>
-                        <div class="global-stat-card">
-                            <h4>MDS Cont</h4>
-                            <p class="val" id="fb-mds-cont">-</p>
-                        </div>
-                        <div class="global-stat-card" style="flex: 1 1 100%; border-color: var(--fb-accent); background: transparent; padding: 10px;">
-                            <h4 style="color: var(--fb-accent);">Relationship Match</h4>
-                            <p class="val" id="fb-global-fscore" style="font-size: 1.6rem; color: var(--fb-accent); margin-top: 4px;">-</p>
-                        </div>
+
                     </div>
                 </div>
 
-                <div id="radar-empty-state" class="dynamic-content-wrapper hidden-panel">
+                <div id="radar-empty-state" class="dynamic-content-wrapper hidden-panel" style="height: 100%; justify-content: center;">
                     <div class="placeholder-content">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
                         <p>Select a single point</p>
-                        <span>Click on a single node to visualize its multidimensional profile vs the clusters via Radar Chart.</span>
+                        <span>Click on a single node to visualize its multidimensional profile via Radar Chart.</span>
                     </div>
                 </div>
 
@@ -213,7 +217,7 @@
                     <div class="gauges-wrapper" style="flex-wrap: wrap;">
                         <div class="stat-card stat-centered-card" style="border: none; background: transparent; width: 100%; margin-bottom: 5px;">
                             <h4 style="font-size: 0.85rem; color: var(--text-title);">Selected Points</h4>
-                            <p class="big-number" id="stat-count" style="font-size: 2.2rem; color: var(--control-sel-text);">0</p>
+                            <p class="big-number" id="stat-count" style="color: var(--control-sel-text);">0</p>
                         </div>
                         <div class="gauge-container">
                             <h4>Precision</h4>
@@ -249,7 +253,8 @@
                     <div id="radar-legend">
                         <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:var(--radar-point);"></span> Selected Point</div>
                         <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:var(--radar-orig);"></span> Original Cluster Avg</div>
-                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:var(--radar-kmeans);"></span> PCA K-Means Avg</div>
+                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:var(--radar-kmeans);"></span> PCA 2D Cluster</div>
+                        <div style="display: flex; align-items: center; gap: 4px;"><span style="display:inline-block; width:15px; height:3px; background:var(--radar-kmeans-mds);"></span> MDS 2D Cluster</div>
                     </div>
                     <div id="radar-chart-svg-container" style="flex: 1; width: 100%; position: relative;"></div>
                 </div>

@@ -1,4 +1,3 @@
-// --- GLOBAL STATE ---
 let dataset = [];
 let metadata = {};
 let colorMode = 'original';
@@ -10,26 +9,25 @@ let brushedPointsGlobal = [];
 let kmeansProjectionSource = 'pca'; 
 let currentDatasetName = "wine";
 
-// Filters
 let minPrecision = 0;
 let minRecall = 0;
 
-// Scales Storage
+let savedBrushExtent = null;
+let savedBrushSource = null;
+
 const scalesMap = { pca: {}, mds: {}, kmeans: {}, pca2d: {}, mds2d: {} };
 
-// D3 Brushes
 let brushPCA, brushMDS, brushKMeans, brushPCA2D, brushMDS2D;
 
-// Radar Chart Data
 let radarDimensions = [];
 let radarMinMax = {};
 let origClusterAvg = {};
-let kmeansClusterAvg = {};
+let pcaKmeansAvg = {}; 
+let mdsKmeansAvg = {};
 
-// Color Scales
 const customTableau = [...d3.schemeTableau10];
 customTableau[2] = '#2ca02c'; 
-customTableau[3] = '#9b59b6'; // Distinct purple for the 4th class (e.g., Very Low in user_knowledge)
+customTableau[3] = '#9b59b6'; 
 
 const colorOriginal = d3.scaleOrdinal(customTableau);
 const bluesDiscrete = ["#08519c", "#3182bd", "#6baed6", "#9ecae1", "#c6dbef"];
@@ -39,12 +37,23 @@ const colorRecall = d3.scaleQuantize().domain([0, 1]).range(redsDiscrete);
 const rdYlGnDiscrete = ["#d73027", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"];
 const colorFScore = d3.scaleQuantize().domain([0, 1]).range(rdYlGnDiscrete);
 
-// Gauges
 const gauges = { precision: { foreground: null }, recall: { foreground: null }, fscore: { foreground: null } };
 const gaugeAngleScale = d3.scaleLinear().domain([0, 1]).range([-Math.PI / 2, Math.PI / 2]);
 
+function updateDatasetSelectWidth() {
+    const select = document.getElementById("dataset-selector");
+    if (!select) return;
+    const temp = document.createElement("span");
+    temp.style.font = window.getComputedStyle(select).font;
+    temp.style.visibility = "hidden";
+    temp.style.whiteSpace = "pre";
+    temp.style.position = "absolute";
+    temp.textContent = select.options[select.selectedIndex].text;
+    document.body.appendChild(temp);
+    select.style.width = (temp.offsetWidth + 42) + "px";
+    document.body.removeChild(temp);
+}
 
-// --- DYNAMIC DASHBOARD INITIALIZATION ---
 function initDashboard(folder) {
     const targetPlotsToClear = [
         "#pca-plot", "#mds-plot", "#kmeans-plot", 
@@ -65,10 +74,18 @@ function initDashboard(folder) {
     brushPCA2D = d3.brush();
     brushMDS2D = d3.brush();
 
-    d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+    const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+    
+    if (currentTab === 'nd') {
+        d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+        d3.select("#radar-empty-state").classed("hidden-panel", true);
+    } else {
+        d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+        d3.select("#radar-empty-state").classed("hidden-panel", false);
+    }
+
     d3.select("#gauges-container").classed("hidden-panel", true);
     d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-    d3.select("#radar-empty-state").classed("hidden-panel", true);
     d3.select("#radar-chart-container").classed("hidden-panel", true);
     d3.select("#neighbor-graph-container").classed("hidden-panel", true);
     d3.select("#dynamic-panel-title").text("Live Analytics");
@@ -130,7 +147,8 @@ function initDashboard(folder) {
 
         radarMinMax = {};
         origClusterAvg = {};
-        kmeansClusterAvg = {};
+        pcaKmeansAvg = {};
+        mdsKmeansAvg = {};
 
         radarDimensions.forEach(dim => {
             radarMinMax[dim] = {
@@ -147,13 +165,18 @@ function initDashboard(folder) {
             });
         });
 
-        const pcaKmeansClasses = Array.from(new Set(dataset.map(d => String(d.pca_kmeans_cluster)).filter(c => c !== "undefined")));
-        pcaKmeansClasses.forEach(c => {
+        const pcaClasses = Array.from(new Set(dataset.map(d => String(d.pca_kmeans_cluster)).filter(c => c !== "undefined")));
+        pcaClasses.forEach(c => {
             let pts = dataset.filter(d => String(d.pca_kmeans_cluster) === c);
-            kmeansClusterAvg[c] = {};
-            radarDimensions.forEach(dim => {
-                kmeansClusterAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]);
-            });
+            pcaKmeansAvg[c] = {};
+            radarDimensions.forEach(dim => pcaKmeansAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]));
+        });
+
+        const mdsClasses = Array.from(new Set(dataset.map(d => String(d.mds_kmeans_cluster)).filter(c => c !== "undefined")));
+        mdsClasses.forEach(c => {
+            let pts = dataset.filter(d => String(d.mds_kmeans_cluster) === c);
+            mdsKmeansAvg[c] = {};
+            radarDimensions.forEach(dim => mdsKmeansAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]));
         });
 
         if(metadata) {
@@ -212,12 +235,12 @@ function initDashboard(folder) {
 
     }).catch(err => {
         console.error(`Error loading dataset [${folder}]:`, err);
-        alert(`Failed to load data for dataset: ${folder}. \n\nEnsure that the CSV file is named '${folder}.csv' and that you have run the Python scripts to generate JSON files in '../json/${folder}/'`);
+        alert(`Failed to load data for dataset: ${folder}.`);
     });
 }
 
-// Initial Boot, Theme Init and Resize Listener
 document.addEventListener("DOMContentLoaded", () => {
+    updateDatasetSelectWidth();
     initDashboard(currentDatasetName);
     initGauge("#gauge-precision", gauges.precision);
     initGauge("#gauge-recall", gauges.recall);
@@ -234,17 +257,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     let resizeTimer;
+    let windowWidth = window.innerWidth;
+    let windowHeight = window.innerHeight;
+    
     window.addEventListener('resize', () => {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-            refreshAllVisualizations();
-        }, 300);
+        if (window.innerWidth !== windowWidth || window.innerHeight !== windowHeight) {
+            windowWidth = window.innerWidth;
+            windowHeight = window.innerHeight;
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                refreshAllVisualizations();
+            }, 300);
+        }
     });
 });
 
-// --- FULL REFRESH FUNCTION FOR DYNAMIC SIZING ---
 function refreshAllVisualizations() {
     if (!dataset || dataset.length === 0) return;
+
+    const currentTab = d3.select("input[name='mainTab']:checked").node().value;
 
     brushPCA = d3.brush();
     brushMDS = d3.brush();
@@ -258,6 +289,11 @@ function refreshAllVisualizations() {
     ];
     targetPlotsToClear.forEach(selector => d3.select(selector).html(""));
 
+    d3.select("#app-grid").classed("mode-2d", false);
+    d3.selectAll(".tab-nd").classed("hidden-panel", false);
+    d3.selectAll(".tab-2d").classed("hidden-panel", true);
+    document.body.clientWidth; 
+
     drawPlot("#pca-plot", "pca_x", "pca_y", "pca", brushPCA);
     drawPlot("#mds-plot", "mds_x", "mds_y", "mds", brushMDS);
     drawPlot("#kmeans-plot", kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x', kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y', "kmeans", brushKMeans, d => {
@@ -266,6 +302,11 @@ function refreshAllVisualizations() {
         return getColor(d);
     });
     drawParallelCoordinates("#pc-plot");
+
+    d3.select("#app-grid").classed("mode-2d", true);
+    d3.selectAll(".tab-nd").classed("hidden-panel", true);
+    d3.selectAll(".tab-2d").classed("hidden-panel", false);
+    document.body.clientWidth; 
 
     drawPlot("#pca-plot-2d", "pca_x", "pca_y", "pca2d", brushPCA2D, d => {
         const showAnon = d3.select("#show-anomalies").property("checked");
@@ -278,13 +319,23 @@ function refreshAllVisualizations() {
         return getColor(d);
     });
 
+    if (currentTab === 'nd') {
+        d3.select("#app-grid").classed("mode-2d", false);
+        d3.selectAll(".tab-nd").classed("hidden-panel", false);
+        d3.selectAll(".tab-2d").classed("hidden-panel", true);
+    } else {
+        d3.select("#app-grid").classed("mode-2d", true);
+        d3.selectAll(".tab-nd").classed("hidden-panel", true);
+        d3.selectAll(".tab-2d").classed("hidden-panel", false);
+    }
+
     setupBrushing();
     applyFilters();
 
     if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
 
     if (selectedPoint) {
-        updateSelection(selectedPoint);
+        updateSelection(selectedPoint, true);
     } else if (brushedPointsGlobal.length > 0) {
         updateLiveAnalytics(brushedPointsGlobal);
         dataset.forEach(d => {
@@ -296,16 +347,19 @@ function refreshAllVisualizations() {
     }
 }
 
-
-// --- GLOBAL EVENT LISTENERS ---
 d3.select("#dataset-selector").on("change", function() {
+    updateDatasetSelectWidth();
     currentDatasetName = this.value;
     initDashboard(currentDatasetName);
 });
 
 d3.select("#point-size-slider").on("input change", function() {
     currentPointSize = +this.value;
-    updateColors(); 
+    
+    d3.selectAll(".dot").attr("d", function(d) {
+        const plotClass = d3.select(this).attr("class");
+        return getSymbolPath(plotClass, d, (selectedPoint && selectedPoint.id === d.id));
+    });
 });
 
 d3.select("#filter-prec").on("input change", function() {
@@ -362,7 +416,7 @@ d3.selectAll("input[name='mainTab']").on("change", function() {
     }
 
     if (selectedPoint) {
-        updateSelection(selectedPoint);
+        updateSelection(selectedPoint); 
     } else if (brushedPointsGlobal.length > 0) {
         updateLiveAnalytics(brushedPointsGlobal);
     } else {
@@ -372,7 +426,6 @@ d3.selectAll("input[name='mainTab']").on("change", function() {
     if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
 });
 
-// --- PLOTTING LOGIC ---
 function redrawKMeansPlot() {
     const xKey = kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x';
     const yKey = kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y';
@@ -385,9 +438,22 @@ function redrawKMeansPlot() {
         return getColor(d);
     });
 
+    if (savedBrushExtent && savedBrushSource === kmeansProjectionSource) {
+        d3.select("#kmeans-plot .brush-group").call(brushKMeans.move, savedBrushExtent);
+    }
+
     applyFilters();
     if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
-    if (selectedPoint) updateSelection(selectedPoint);
+    
+    if (selectedPoint) {
+        updateSelection(selectedPoint, true);
+    } else if (brushedPointsGlobal.length > 0) {
+        dataset.forEach(d => {
+            const isSelected = brushedPointsGlobal.includes(d);
+            d3.selectAll(`.pt-${d.id}:not(.filtered-out)`).style("opacity", isSelected ? 0.9 : 0.15);
+        });
+        updateLiveAnalytics(brushedPointsGlobal); 
+    }
 }
 
 function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn = null) {
@@ -407,10 +473,12 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
         brushedPointsGlobal = [];
         d3.selectAll(".dot").style("opacity", 0.9);
         
-        // Return PC Lines to default visibility and stroke
         d3.selectAll(".pc-line")
           .style("opacity", 0.6)
-          .style("stroke-width", 1.5)
+          .style("stroke-width", d => {
+              const showAnon = d3.select("#show-anomalies").property("checked");
+              return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+          })
           .style("stroke", d => getLineColor(d));
           
         d3.selectAll(".link-group line").remove();
@@ -458,16 +526,32 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
             else if (plotId === 'mds2d') isAnom = d.mds_is_anomaly;
             else if (plotId === 'kmeans') isAnom = d.is_anomaly;
             
-            d3.selectAll(`.dot.pt-${d.id}`)
-              .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, true); })
-              .style("stroke", (showAnon && isAnom) ? "var(--anomaly-hover)" : "var(--hover-stroke)")
-              .style("stroke-width", 2).raise();
+            d3.selectAll(`.dot.pt-${d.id}`).each(function(p) {
+                const self = d3.select(this);
+                const currentD = self.attr("d");
+                const nextD = getSymbolPath(self.attr("class"), p, true);
+                
+                if (currentD !== nextD) {
+                    self.transition().duration(150).style("opacity", 0)
+                        .on("end", function() {
+                            self.attr("d", nextD)
+                                .style("stroke", (showAnon && isAnom) ? "var(--anomaly-hover)" : "var(--hover-stroke)")
+                                .style("stroke-width", 2)
+                                .transition().duration(150).style("opacity", 1)
+                                .on("end", function() { self.raise(); });
+                        });
+                } else {
+                    self.transition().duration(300)
+                        .style("stroke", (showAnon && isAnom) ? "var(--anomaly-hover)" : "var(--hover-stroke)")
+                        .style("stroke-width", 2).on("end", function() { self.raise(); });
+                }
+            });
               
-            // FORCE PC Line highlight on hover to maximum clarity with secure color
             d3.selectAll(`.pc-line.pt-${d.id}`)
+              .interrupt()
               .style("opacity", 1) 
               .style("stroke", (showAnon && d.is_anomaly && colorMode === 'original') ? "var(--anomaly-hover)" : getLineColor(d))
-              .style("stroke-width", 4).raise();
+              .raise();
               
             showTooltip(event, d);
         })
@@ -483,7 +567,6 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
     brushObj.yScale = yScale;
 }
 
-// --- FILTERS & ANOMALIES ---
 function applyFilters() {
     d3.selectAll(".dot, .pc-line")
         .classed("filtered-out", d => d.precision < minPrecision || d.recall < minRecall)
@@ -565,7 +648,10 @@ function toggleDiscrepancies(show) {
         d3.selectAll(".dot.dot-mds2d:not(.filtered-out)").style("opacity", d => d.mds_is_anomaly ? 1.0 : 0.2);
         
         if (!selectedPoint) {
-            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5).style("stroke", d => getLineColor(d));
+            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", d => {
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+            }).style("stroke", d => getLineColor(d));
         }
 
         let activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
@@ -575,16 +661,23 @@ function toggleDiscrepancies(show) {
         allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
         d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
         if (!selectedPoint) {
-            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5).style("stroke", d => getLineColor(d));
+            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", d => {
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+            }).style("stroke", d => getLineColor(d));
         }
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
         if (!selectedPoint && brushedPointsGlobal.length === 0) {
-            d3.select("#empty-state-placeholder").classed("hidden-panel", false);
-            d3.select("#dynamic-panel-title").text("Live Analytics");
+            if (currentTab === '2d') {
+                d3.select("#radar-empty-state").classed("hidden-panel", false);
+                d3.select("#dynamic-panel-title").text("Live Analytics");
+            } else {
+                d3.select("#empty-state-placeholder").classed("hidden-panel", false);
+                d3.select("#dynamic-panel-title").text("Live Analytics");
+            }
         }
     }
     
-    // RESTORE SELECTION LOGIC AFTER TOGGLE
     if (selectedPoint) {
         const currentTab = d3.select("input[name='mainTab']:checked").node().value;
         const activeIds = new Set([selectedPoint.id, ...(selectedPoint.neighbors || [])]);
@@ -596,11 +689,13 @@ function toggleDiscrepancies(show) {
                 return 0.1;
             });
             
-        // PC-LINE: Highlight ONLY selected point, fade ALL others
         d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("stroke", d => getLineColor(d)) // Make sure color is robust
+            .style("stroke", d => getLineColor(d)) 
             .style("opacity", p => p.id === selectedPoint.id ? 1 : 0.05)
-            .style("stroke-width", p => p.id === selectedPoint.id ? 4 : 1);
+            .style("stroke-width", p => {
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                return (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+            });
 
         if (currentTab === 'nd') {
             d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === selectedPoint.id).raise();
@@ -670,8 +765,7 @@ function updateConfusionMatrix(activePoints, tabMode) {
     d3.select("#cm-table").html(fullHtml);
 }
 
-// --- SYNC & INTERACTION ---
-function updateSelection(d) {
+function updateSelection(d, skipNeighborGraph = false) {
     selectedPoint = d;
     brushedPointsGlobal = []; 
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
@@ -693,7 +787,6 @@ function updateSelection(d) {
         const neighborIds = d.neighbors || [];
         const activeIds = new Set([d.id, ...neighborIds]);
 
-        // SCATTERPLOTS: Keep neighbors visible/highlighted
         d3.selectAll(".dot:not(.filtered-out)")
             .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.8 : 0.1))
             .attr("d", function(p) {
@@ -701,11 +794,14 @@ function updateSelection(d) {
             })
             .style("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
-        // PARALLEL COORDINATES: Highlight ONLY selected point, completely ignoring neighbors
         d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("stroke", p => getLineColor(p)) // Ensure color is present
+            .interrupt()
+            .style("stroke", p => getLineColor(p)) 
             .style("opacity", p => p.id === d.id ? 1 : 0.05)
-            .style("stroke-width", p => p.id === d.id ? 4 : 1);
+            .style("stroke-width", p => {
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                return (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+            });
 
         d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
         d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
@@ -718,7 +814,10 @@ function updateSelection(d) {
         drawLines("kmeans", d, neighborIds, kmeansXKey, kmeansYKey, brushKMeans);
 
         const neighborsData = neighborIds.map(id => pointById.get(id)).filter(Boolean);
-        drawNeighborGraph(d, neighborsData);
+        
+        if (!skipNeighborGraph) {
+            drawNeighborGraph(d, neighborsData);
+        }
 
     } else {
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
@@ -737,9 +836,12 @@ function updateSelection(d) {
             .style("stroke-width", p => p.id === d.id ? 2 : 0.8);
 
         d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("stroke", p => getLineColor(p)) // Ensure color is present
+            .style("stroke", p => getLineColor(p)) 
             .style("opacity", p => p.id === d.id ? 1 : 0.05)
-            .style("stroke-width", p => p.id === d.id ? 4 : 1);
+            .style("stroke-width", p => {
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                return (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+            });
 
         d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
         d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === d.id).raise();
@@ -801,8 +903,15 @@ function handleBrush(event, brushObj, xKey, yKey) {
         if (event.type === "end") {
             selectedPoint = null;
             brushedPointsGlobal = [];
+            if (brushObj === brushKMeans) {
+                savedBrushExtent = null;
+                savedBrushSource = null;
+            }
             d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9); 
-            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", 1.5).style("stroke", d => getLineColor(d));
+            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", d => {
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+            }).style("stroke", d => getLineColor(d));
             resetAllHovers(); 
             updateLiveAnalytics([]); 
         }
@@ -811,6 +920,12 @@ function handleBrush(event, brushObj, xKey, yKey) {
 
     selectedPoint = null;
     const [[x0, y0], [x1, y1]] = event.selection;
+
+    if (brushObj === brushKMeans) {
+        savedBrushExtent = [[x0, y0], [x1, y1]];
+        savedBrushSource = kmeansProjectionSource;
+    }
+
     let selectedPoints = [];
     
     dataset.forEach(d => {
@@ -834,18 +949,28 @@ function updateLiveAnalytics(selectedPoints) {
     if (currentTab === '2d') {
         d3.select("#gauges-container").classed("hidden-panel", true);
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
-        d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-        d3.select("#empty-state-placeholder").classed("hidden-panel", true);
-        
+
         if (selectedPoints.length === 1) {
-            d3.select("#dynamic-panel-title").text("Multidimensional Profile (Radar)");
+            d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+            d3.select("#confusion-matrix-container").classed("hidden-panel", true);
             d3.select("#radar-empty-state").classed("hidden-panel", true);
             d3.select("#radar-chart-container").classed("hidden-panel", false);
+            d3.select("#dynamic-panel-title").text("Multidimensional Profile (Radar)");
             drawRadarChart(selectedPoints[0]);
         } else {
-            d3.select("#dynamic-panel-title").text("Live Analytics");
             d3.select("#radar-chart-container").classed("hidden-panel", true);
-            d3.select("#radar-empty-state").classed("hidden-panel", false);
+            
+            if (isAnomalyOn) {
+                d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+                d3.select("#radar-empty-state").classed("hidden-panel", true);
+                d3.select("#confusion-matrix-container").classed("hidden-panel", false);
+                updateConfusionMatrix(selectedPoints.length > 1 ? selectedPoints : baseDataset, '2d');
+            } else {
+                d3.select("#confusion-matrix-container").classed("hidden-panel", true);
+                d3.select("#empty-state-placeholder").classed("hidden-panel", true);
+                d3.select("#radar-empty-state").classed("hidden-panel", false);
+                d3.select("#dynamic-panel-title").text("Live Analytics");
+            }
         }
         
         const activeData = selectedPoints.length > 1 ? selectedPoints : baseDataset;
@@ -890,7 +1015,6 @@ function updateLiveAnalytics(selectedPoints) {
     updateGauge(gauges.fscore, avgFScore, colorFScore(avgFScore), "#val-fscore");
 }
 
-// --- RADAR CHART ---
 function drawRadarChart(point) {
     const container = d3.select("#radar-chart-svg-container");
     container.html(""); 
@@ -978,13 +1102,23 @@ function drawRadarChart(point) {
             .style("stroke-width", "2px");
     }
 
-    const kmeansData = kmeansClusterAvg[String(point.pca_kmeans_cluster)];
-    if (kmeansData) {
+    const pcaData = pcaKmeansAvg[String(point.pca_kmeans_cluster)];
+    if (pcaData) {
         svg.append("path")
-            .datum(getCoordinates(kmeansData))
+            .datum(getCoordinates(pcaData))
             .attr("d", lineBuilder)
             .style("fill", "none")
             .style("stroke", "var(--radar-kmeans)") 
+            .style("stroke-width", "2px");
+    }
+
+    const mdsData = mdsKmeansAvg[String(point.mds_kmeans_cluster)];
+    if (mdsData) {
+        svg.append("path")
+            .datum(getCoordinates(mdsData))
+            .attr("d", lineBuilder)
+            .style("fill", "none")
+            .style("stroke", "var(--radar-kmeans-mds)") 
             .style("stroke-width", "2px");
     }
 
@@ -996,17 +1130,15 @@ function drawRadarChart(point) {
         .attr("d", lineBuilder)
         .style("fill", "none")
         .style("stroke", "var(--radar-point)") 
-        .style("stroke-width", "2.5px");
+        .style("stroke-width", "3px");
         
     svg.selectAll(".radar-point")
         .data(getCoordinates(pointData))
         .enter().append("circle")
         .attr("cx", d => d.x).attr("cy", d => d.y)
-        .attr("r", 3)
+        .attr("r", 4)
         .style("fill", "var(--radar-point)");
 }
-
-// --- UTILITIES ---
 
 function getLineColor(d) {
     const showAnon = d3.select("#show-anomalies").property("checked");
@@ -1033,30 +1165,100 @@ function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
 }
 
 function resetAllHovers() {
+    const showAnon = d3.select("#show-anomalies").property("checked");
+
     if (selectedPoint) {
-        // Scatterplot dots: Reset hovered dot sizes but keep selected distinct
-        d3.selectAll(".dot")
-            .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, p.id === selectedPoint.id); })
-            .style("stroke", p => p.id === selectedPoint.id ? "var(--hover-stroke)" : "var(--dot-stroke)")
-            .style("stroke-width", p => p.id === selectedPoint.id ? 2 : 0.8);
+        const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+        const neighborIds = selectedPoint.neighbors || [];
+        const activeIds = new Set([selectedPoint.id, ...neighborIds]);
+
+        d3.selectAll(".dot").each(function(p) {
+            const self = d3.select(this);
+            const currentD = self.attr("d");
+            const nextD = getSymbolPath(self.attr("class"), p, p.id === selectedPoint.id);
             
-        // PC Lines: ENSURE strict focus on the selected point alone
-        d3.selectAll(".pc-line")
-            .style("stroke", d => getLineColor(d)) // Restore color
+            let targetOpacity = 0.1;
+            if (p.id === selectedPoint.id) {
+                targetOpacity = 1;
+            } else if (currentTab === 'nd' && activeIds.has(p.id)) {
+                targetOpacity = 0.8;
+            }
+            
+            if (currentD !== nextD) {
+                self.transition().duration(150).style("opacity", 0)
+                    .on("end", function() {
+                        self.attr("d", nextD)
+                            .style("stroke", p.id === selectedPoint.id ? "var(--hover-stroke)" : "var(--dot-stroke)")
+                            .style("stroke-width", p.id === selectedPoint.id ? 2 : 0.8)
+                            .transition().duration(150).style("opacity", targetOpacity);
+                    });
+            } else {
+                self.transition().duration(300)
+                    .style("stroke", p.id === selectedPoint.id ? "var(--hover-stroke)" : "var(--dot-stroke)")
+                    .style("stroke-width", p.id === selectedPoint.id ? 2 : 0.8)
+                    .style("opacity", targetOpacity);
+            }
+        });
+            
+        d3.selectAll(".pc-line").transition().duration(300)
+            .style("stroke", d => getLineColor(d)) 
             .style("opacity", p => p.id === selectedPoint.id ? 1 : 0.05)
-            .style("stroke-width", p => p.id === selectedPoint.id ? 4 : 1);
-            
-        d3.selectAll(".pc-line").filter(p => p.id === selectedPoint.id).raise();
+            .style("stroke-width", p => {
+                const showAnon = d3.select("#show-anomalies").property("checked");
+                return (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+            });
         
+    } else if (brushedPointsGlobal && brushedPointsGlobal.length > 0) {
+        d3.selectAll(".dot").each(function(p) {
+            const self = d3.select(this);
+            const isSelected = brushedPointsGlobal.includes(p);
+            const nextD = getSymbolPath(self.attr("class"), p, false);
+            
+            self.transition().duration(300)
+                .attr("d", nextD)
+                .style("stroke", "var(--dot-stroke)")
+                .style("stroke-width", 0.8)
+                .style("opacity", isSelected ? 0.9 : 0.15);
+        });
+        
+        d3.selectAll(".pc-line").transition().duration(300)
+            .style("stroke", d => getLineColor(d))
+            .style("opacity", p => brushedPointsGlobal.includes(p) ? 0.9 : 0.05);
     } else {
-        d3.selectAll(".dot")
-            .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, false); })
-            .style("stroke", "var(--dot-stroke)")
-            .style("stroke-width", 0.8);
+        const showCentroids = d3.select("#show-discrepancies").property("checked");
+
+        d3.selectAll(".dot").each(function(p) {
+            const self = d3.select(this);
+            const currentD = self.attr("d");
+            const nextD = getSymbolPath(self.attr("class"), p, false);
+            const plotClass = self.attr("class");
+            
+            let targetOpacity = 0.9;
+            if (showCentroids) {
+                if (plotClass && plotClass.includes("kmeans")) targetOpacity = p.is_anomaly ? 1.0 : 0.2;
+                else if (plotClass && plotClass.includes("pca2d")) targetOpacity = p.pca_is_anomaly ? 1.0 : 0.2;
+                else if (plotClass && plotClass.includes("mds2d")) targetOpacity = p.mds_is_anomaly ? 1.0 : 0.2;
+            }
+            
+            if (currentD !== nextD) {
+                self.transition().duration(150).style("opacity", 0)
+                    .on("end", function() {
+                        self.attr("d", nextD)
+                            .style("stroke", "var(--dot-stroke)")
+                            .style("stroke-width", 0.8)
+                            .transition().duration(150).style("opacity", targetOpacity); // Usa targetOpacity
+                    });
+            } else {
+                self.transition().duration(300)
+                    .style("stroke", "var(--dot-stroke)")
+                    .style("stroke-width", 0.8)
+                    .style("opacity", targetOpacity); // Usa targetOpacity
+            }
+        });
         
         const showAnon = d3.select("#show-anomalies").property("checked");
-        d3.selectAll(".pc-line")
-            .style("stroke", d => getLineColor(d)) // Restore color
+        d3.selectAll(".pc-line").transition().duration(300)
+            .style("stroke", d => getLineColor(d)) 
             .style("stroke-width", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5)
             .style("opacity", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6);
     }
@@ -1103,27 +1305,37 @@ function getColor(d) {
 function updateColors() {
     const showAnon = d3.select("#show-anomalies").property("checked");
 
-    d3.selectAll(".dot").transition().duration(500)
-        .style("fill", function(d) {
-            const plotClass = d3.select(this).attr("class");
-            let isAnom = false;
-            
-            if (plotClass && plotClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
-            else if (plotClass && plotClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
-            else if (plotClass && plotClass.includes("kmeans")) isAnom = d.is_anomaly;
+    d3.selectAll(".dot").each(function(d) {
+        const self = d3.select(this);
+        const plotClass = self.attr("class");
+        let isAnom = false;
+        
+        if (plotClass && plotClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
+        else if (plotClass && plotClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
+        else if (plotClass && plotClass.includes("kmeans")) isAnom = d.is_anomaly;
 
-            if (colorMode === 'original') return (showAnon && isAnom) ? 'var(--anomaly-color)' : colorOriginal(d.label);
-            return getColor(d);
-        })
-        .attr("d", function(d) {
-            return getSymbolPath(d3.select(this).attr("class"), d, (selectedPoint && selectedPoint.id === d.id));
-        });
+        const currentD = self.attr("d");
+        const nextD = getSymbolPath(plotClass, d, (selectedPoint && selectedPoint.id === d.id));
+        const nextFill = (colorMode === 'original' && showAnon && isAnom) ? 'var(--anomaly-color)' : getColor(d);
+        const currentOpacity = self.style("opacity");
+
+        if (currentD !== nextD) {
+            self.transition().duration(150).style("opacity", 0)
+                .on("end", function() {
+                    self.attr("d", nextD)
+                        .style("fill", nextFill)
+                        .transition().duration(150).style("opacity", currentOpacity);
+                });
+        } else {
+            self.transition().duration(300)
+                .attr("d", nextD)
+                .style("fill", nextFill);
+        }
+    });
     
-    d3.selectAll(".pc-line").transition().duration(500)
+    d3.selectAll(".pc-line").transition().duration(300)
         .style("stroke", d => getLineColor(d))
-        // PROTECT THE SELECTED LINE: Do not overwrite opacity/thickness if a point is actively selected
         .style("stroke-width", d => {
-            if (selectedPoint) return d.id === selectedPoint.id ? 4 : 1;
             return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
         })
         .style("opacity", d => {
@@ -1181,10 +1393,11 @@ function initGauge(selector, gaugeObj) {
 }
 
 function updateGauge(gaugeObj, value, color, textSelector) {
-    const targetAngle = gaugeAngleScale(value);
+    const safeValue = isNaN(value) ? 0 : value;
+    const targetAngle = gaugeAngleScale(safeValue);
     const arcFg = d3.arc().innerRadius(30).outerRadius(45).startAngle(-Math.PI / 2).cornerRadius(3);
 
-    d3.select(textSelector).text((value * 100).toFixed(1) + "%");
+    d3.select(textSelector).text((safeValue * 100).toFixed(1) + "%");
 
     gaugeObj.foreground.transition().duration(750)
         .attrTween("d", function(d) {
@@ -1201,22 +1414,22 @@ function showTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
     
     let fpText = d.precision < 0.9 
-        ? `🔴 <span style="color: #f1c40f; font-style: italic; font-weight: bold;">False Positive:</span> Attracts <span style="color: white; font-weight: bold;">${((1 - d.precision)*100).toFixed(1)}%</span> of points from other classes.` 
-        : `🟢 <span style="color: #f1c40f; font-style: italic; font-weight: bold;">Low FPs:</span> No class mixing.`;
+        ? `🔴 <span style="color: var(--control-sel-text); font-style: italic; font-weight: bold;">False Positive:</span> Attracts <span style="font-weight: bold;">${((1 - d.precision)*100).toFixed(1)}%</span> of points from other classes.` 
+        : `🟢 <span style="color: var(--control-sel-text); font-style: italic; font-weight: bold;">Low FPs:</span> No class mixing.`;
         
     let fnText = d.recall < 0.9 
-        ? `🔴 <span style="color: #f1c40f; font-style: italic; font-weight: bold;">False Negative:</span> Disconnected from <span style="color: white; font-weight: bold;">${((1 - d.recall)*100).toFixed(1)}%</span> of points in its own class.` 
-        : `🟢 <span style="color: #f1c40f; font-style: italic; font-weight: bold;">Low FNs:</span> Highly cohesive.`;
+        ? `🔴 <span style="color: var(--control-sel-text); font-style: italic; font-weight: bold;">False Negative:</span> Disconnected from <span style="font-weight: bold;">${((1 - d.recall)*100).toFixed(1)}%</span> of points in its own class.` 
+        : `🟢 <span style="color: var(--control-sel-text); font-style: italic; font-weight: bold;">Low FNs:</span> Highly cohesive.`;
 
     let anomalyText = d.is_anomaly ? `<span style='color: var(--anomaly-color);'>⚠️ <strong>Anomaly:</strong> True P${d.label} assigned to KMeans C${d.kmeans_cluster}</span><br>` : "";
 
     tooltip.html(`
-        <strong style="color: #f1c40f;">ID:</strong> ${d.id} | <strong style="color: #f1c40f;">Class:</strong> ${d.label}<br>
-        <strong style="color: #f1c40f;">Precision:</strong> ${d.precision === 1 ? "100" : (d.precision*100).toFixed(1)}%<br>
-        <strong style="color: #f1c40f;">Recall:</strong> ${d.recall === 1 ? "100" : (d.recall*100).toFixed(1)}%<br>
-        <strong style="color: #f1c40f;">F-Score:</strong> ${d.f_score === 1 ? "100" : (d.f_score*100).toFixed(1)}%
-        <hr style="border: 0; border-top: 1px solid #555; margin: 8px 0 6px 0;">
-        <div style="color: #ecf0f1; line-height: 1.4;">
+        <strong style="color: var(--control-sel-text);">ID:</strong> ${d.id} | <strong style="color: var(--control-sel-text);">Class:</strong> ${d.label}<br>
+        <strong style="color: var(--control-sel-text);">Precision:</strong> ${d.precision === 1 ? "100" : (d.precision*100).toFixed(1)}%<br>
+        <strong style="color: var(--control-sel-text);">Recall:</strong> ${d.recall === 1 ? "100" : (d.recall*100).toFixed(1)}%<br>
+        <strong style="color: var(--control-sel-text);">F-Score:</strong> ${d.f_score === 1 ? "100" : (d.f_score*100).toFixed(1)}%
+        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0 6px 0;">
+        <div style="color: var(--text-main); line-height: 1.4;">
             ${anomalyText}
             ${fpText}<br>
             ${fnText}
@@ -1234,11 +1447,11 @@ function showTooltip(event, d) {
     let y = event.pageY + margin;
     if (y + tooltipHeight > window.innerHeight) y = event.pageY - tooltipHeight - margin;
 
-    tooltip.style("left", x + "px").style("top", y + "px").transition().duration(100).style("opacity", 1);
+    tooltip.style("left", x + "px").style("top", y + "px").transition().duration(250).style("opacity", 1);
 }
 
 function hideTooltip() {
-    d3.select("#tooltip").transition().duration(200).style("opacity", 0);
+    d3.select("#tooltip").transition().duration(300).style("opacity", 0);
 }
 
 function showAttributeTooltip(event, d) {
@@ -1248,7 +1461,7 @@ function showAttributeTooltip(event, d) {
     const formatKey = (key) => key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
 
     const attributesHtml = radarDimensions
-        .map(key => `<strong><span style="color: #f1c40f;">${formatKey(key)}:</span></strong> <span style="color: white;">${d.attributes[key]}</span>`).join('<br>');
+        .map(key => `<strong><span style="color: var(--control-sel-text);">${formatKey(key)}:</span></strong> <span>${d.attributes[key]}</span>`).join('<br>');
 
     tooltip.html(attributesHtml);
 
@@ -1262,7 +1475,7 @@ function showAttributeTooltip(event, d) {
     let y = event.pageY + margin;
     if (y + tooltipHeight > window.innerHeight) y = event.pageY - tooltipHeight - margin;
 
-    tooltip.style("left", x + "px").style("top", y + "px").transition().duration(100).style("opacity", 1);
+    tooltip.style("left", x + "px").style("top", y + "px").transition().duration(250).style("opacity", 1);
 }
 
 function drawNeighborGraph(centerNode, neighborNodes) {
@@ -1567,7 +1780,10 @@ function drawSankeyDiagram(selector, activeData) {
             d3.selectAll(".pc-line:not(.filtered-out)")
                 .style("stroke", p => getLineColor(p))
                 .style("opacity", p => linkPointIds.has(p.id) ? 1 : 0.05)
-                .style("stroke-width", p => linkPointIds.has(p.id) ? 2.5 : 1);
+                .style("stroke-width", p => {
+                    const showAnon = d3.select("#show-anomalies").property("checked");
+                    return (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+                });
                 
             d3.selectAll(".centroid-link")
                 .style("display", function() {
@@ -1637,7 +1853,10 @@ function drawParallelCoordinates(containerSelector) {
         
         d3.selectAll(".pc-line")
           .style("opacity", 0.6)
-          .style("stroke-width", 1.5)
+          .style("stroke-width", d => {
+              const showAnon = d3.select("#show-anomalies").property("checked");
+              return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+          })
           .style("stroke", d => getLineColor(d));
           
         d3.selectAll(".link-group line").remove();
@@ -1687,15 +1906,29 @@ function drawParallelCoordinates(containerSelector) {
             resetAllHovers();
             const showAnon = d3.select("#show-anomalies").property("checked");
             
-            d3.selectAll(`.dot.pt-${d.id}`)
-              .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, true); })
-              .style("stroke", "var(--hover-stroke)")
-              .style("stroke-width", 2).raise();
+            d3.selectAll(`.dot.pt-${d.id}`).each(function(p) {
+                const self = d3.select(this);
+                const nextD = getSymbolPath(self.attr("class"), p, true);
+                if (self.attr("d") !== nextD) {
+                    self.transition().duration(250).style("opacity", 0)
+                        .on("end", function() {
+                            self.attr("d", nextD)
+                                .style("stroke", "var(--hover-stroke)")
+                                .style("stroke-width", 2)
+                                .transition().duration(250).style("opacity", 1)
+                                .on("end", function() { self.raise(); });
+                        });
+                } else {
+                    self.transition().duration(300)
+                        .style("stroke", "var(--hover-stroke)")
+                        .style("stroke-width", 2).on("end", function() { self.raise(); });
+                }
+            });
               
             d3.selectAll(`.pc-line.pt-${d.id}`)
+              .interrupt()
               .style("opacity", 1)
               .style("stroke", (showAnon && d.is_anomaly && colorMode === 'original') ? "var(--anomaly-hover)" : getLineColor(d))
-              .style("stroke-width", 4).raise();
               
             showAttributeTooltip(event, d);
         })
