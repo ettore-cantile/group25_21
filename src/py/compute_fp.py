@@ -111,13 +111,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--k", 
         type=int, 
-        default=15, 
+        default=10, 
         help="Number of neighbors (k) to consider. Default: 15"
     )
     parser.add_argument(
         "--threshold", 
         type=float, 
-        default=0.85, 
+        default=0.7, 
         help="Minimum mismatch threshold (0.0 to 1.0) to declare a point as a False Positive. Example: 0.6 = 60%. Default: 0.8"
     )
     
