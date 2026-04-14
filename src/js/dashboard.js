@@ -542,7 +542,7 @@ function applyFilters() {
         if (isGeneralFiltered) {
             self.classed("filtered-out", true).style("display", "none").style("pointer-events", "none");
         } else {
-            self.classed("filtered-out", false).style("display", null).style("pointer-events", isFpFiltered ? "none" : "auto");
+            self.classed("filtered-out", false).style("display", null);
         }
     });
 

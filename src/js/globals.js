@@ -245,7 +245,8 @@ function resetAllHovers() {
             .style("fill", finalFill)
             .style("stroke", finalStroke)
             .style("stroke-width", finalStrokeWidth)
-            .style("opacity", finalOpacity);
+            .style("opacity", finalOpacity)
+            .style("pointer-events", finalOpacity > 0 ? "all" : "none"); 
     });
 
     d3.selectAll(".pc-line").each(function(p) {
@@ -270,7 +271,8 @@ function resetAllHovers() {
 
         self.style("stroke", getLineColor(p))
             .style("stroke-width", sw)
-            .style("opacity", finalOpacity);
+            .style("opacity", finalOpacity)
+            .style("pointer-events", finalOpacity > 0 ? "all" : "none");
     });
 
     hideTooltip();
