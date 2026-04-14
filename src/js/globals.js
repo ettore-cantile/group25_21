@@ -159,9 +159,10 @@ function updateDatasetSelectWidth() {
     document.body.removeChild(temp);
 }
 
-// Resets visual highlight and opacity across all plots
+// Resets visual highlight and opacity across all plots, handling "border-only" style for filtered neighbors
 function resetAllHovers() {
     const showAnon = d3.select("#show-anomalies").property("checked");
+    const showCentroids = d3.select("#show-discrepancies").property("checked");
 
     if (selectedPoint) {
         const currentTab = d3.select("input[name='mainTab']:checked").node().value;
@@ -172,18 +173,26 @@ function resetAllHovers() {
             .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, p.id === selectedPoint.id); })
             .style("stroke", p => p.id === selectedPoint.id ? "var(--hover-stroke)" : "var(--dot-stroke)")
             .style("stroke-width", p => p.id === selectedPoint.id ? 2 : 0.8)
-            .style("opacity", p => {
+            .style("fill", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
+                // If point is hidden by FP filter but is selected or is a neighbor, show border only
+                if (isFiltered && activeIds.has(p.id)) return "transparent";
+                return getColor(p);
+            })
+            .style("opacity", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
                 if (p.id === selectedPoint.id) return 1;
                 if (currentTab === 'nd' && activeIds.has(p.id)) return 0.8;
-                return 0.1;
+                return isFiltered ? 0 : 0.1;
             });
 
         d3.selectAll(".pc-line")
             .style("stroke-width", p => p.id === selectedPoint.id ? 3 : 1.5)
             .style("stroke", d => getLineColor(d))
-            .style("opacity", p => {
+            .style("opacity", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
                 if (p.id === selectedPoint.id) return 1;
-                return 0.05;
+                return isFiltered ? 0 : 0.05;
             });
 
     } else if (brushedPointsGlobal && brushedPointsGlobal.length > 0) {
@@ -191,32 +200,66 @@ function resetAllHovers() {
             .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, false); })
             .style("stroke", "var(--dot-stroke)")
             .style("stroke-width", 0.8)
-            .style("opacity", p => brushedPointsGlobal.includes(p) ? 0.9 : 0.15);
+            .style("fill", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
+                if (isFiltered && brushedPointsGlobal.includes(p)) return "transparent";
+                return getColor(p);
+            })
+            .style("opacity", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
+                if (brushedPointsGlobal.includes(p)) return 0.9;
+                return isFiltered ? 0 : 0.15;
+            });
 
         d3.selectAll(".pc-line")
             .style("stroke", d => getLineColor(d))
-            .style("opacity", p => brushedPointsGlobal.includes(p) ? 0.9 : 0.05);
+            .style("opacity", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
+                if (brushedPointsGlobal.includes(p)) return 0.9;
+                return isFiltered ? 0 : 0.05;
+            });
     } else {
-        const showCentroids = d3.select("#show-discrepancies").property("checked");
-
         d3.selectAll(".dot")
             .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, false); })
             .style("stroke", "var(--dot-stroke)")
             .style("stroke-width", 0.8)
-            .style("opacity", function(p) {
+            .style("fill", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
                 const plotClass = d3.select(this).attr("class");
-                if (showCentroids) {
-                    if (plotClass && plotClass.includes("kmeans")) return p.is_anomaly ? 1.0 : 0.2;
-                    if (plotClass && plotClass.includes("pca2d")) return p.pca_is_anomaly ? 1.0 : 0.2;
-                    if (plotClass && plotClass.includes("mds2d")) return p.mds_is_anomaly ? 1.0 : 0.2;
+                // If it's an FP-hidden point targeted by a centroid line, make it transparent
+                let isTargetedByCentroid = false;
+                if (plotClass && (plotClass.includes("kmeans") || plotClass.includes("pca2d") || plotClass.includes("mds2d"))) {
+                    isTargetedByCentroid = true;
                 }
-                return 0.9;
+                if (isFiltered && showCentroids && isTargetedByCentroid) return "transparent";
+                return getColor(p);
+            })
+            .style("opacity", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
+                const plotClass = d3.select(this).attr("class");
+                
+                if (showCentroids) {
+                    let isTargetedByCentroid = false;
+                    if (plotClass && (plotClass.includes("kmeans") || plotClass.includes("pca2d") || plotClass.includes("mds2d"))) {
+                        isTargetedByCentroid = true;
+                    }
+                    if (isTargetedByCentroid) {
+                        if (p.is_anomaly) return 1.0;
+                        if (isFiltered) return 0.8; // Bring back the opacity to show the border
+                        return 0.2;
+                    }
+                }
+                return isFiltered ? 0 : 0.9;
             });
 
         d3.selectAll(".pc-line")
             .style("stroke", d => getLineColor(d))
             .style("stroke-width", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5)
-            .style("opacity", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6);
+            .style("opacity", function(p) {
+                const isFiltered = d3.select(this).classed("filtered-fp");
+                if (isFiltered) return 0;
+                return (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6;
+            });
     }
     hideTooltip();
 }

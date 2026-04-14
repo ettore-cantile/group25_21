@@ -1,4 +1,5 @@
 // --- MAIN LOGIC & EVENT CONTROLLERS ---
+
 // Initial Core Bootstrapper logic mapped against JSON payloads
 function initDashboard(folder) {
     const targetPlotsToClear = [
@@ -38,7 +39,6 @@ function initDashboard(folder) {
 
     const basePath = `../json/${folder}/`;
 
-    // Fetch required datasets, catching the fp_results since it might be optional
     Promise.all([
         d3.json(`${basePath}step2_final_data.json?v=${Date.now()}`),
         d3.csv(`../../dataset/${folder}.csv`),
@@ -68,7 +68,6 @@ function initDashboard(folder) {
             return String(str).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         };
 
-        // Combine all loaded data into the primary dataset array
         data.points.forEach((p, i) => {
             if (csvData[i]) p.attributes = csvData[i];
 
@@ -134,7 +133,6 @@ function initDashboard(folder) {
             radarDimensions.forEach(dim => mdsKmeansAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]));
         });
 
-        // Set global metrics texts
         if(metadata) {
             if (metadata.global_assessment && metadata.global_assessment.pca && metadata.global_assessment.mds) {
                 d3.select("#fb-pca-trust").text((metadata.global_assessment.pca.trustworthiness * 100).toFixed(1) + "%");
@@ -197,7 +195,6 @@ function initDashboard(folder) {
 
 // Function to dynamically call the Public Python microservice to compute False Positives
 async function recomputeFP() {
-    // Solo l'URL pubblico, niente opzioni locali
     const baseUrl = 'https://matteotwentywings.pythonanywhere.com';
     
     const k = parseInt(d3.select(".sync-k").node().value) || 15;
@@ -220,13 +217,11 @@ async function recomputeFP() {
         const fpPcaSet = new Set(data.false_positive_points_pca || []);
         const fpMdsSet = new Set(data.false_positive_points_mds || []);
         
-        // Update the dataset with the newly computed values
         dataset.forEach(d => {
             d.is_fp_pca = fpPcaSet.has(d.id);
             d.is_fp_mds = fpMdsSet.has(d.id);
         });
         
-        // Reapply visual filters based on new FP status
         applyFilters();
         
     } catch (err) {
@@ -243,19 +238,16 @@ document.addEventListener("DOMContentLoaded", () => {
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
 
-    // Event listener to sync K input across plots and trigger API recompute
     d3.selectAll(".sync-k").on("change", function() {
         d3.selectAll(".sync-k").property("value", this.value);
         recomputeFP();
     });
     
-    // Event listener to sync Threshold input across plots and trigger API recompute
     d3.selectAll(".sync-thresh").on("change", function() {
         d3.selectAll(".sync-thresh").property("value", this.value);
         recomputeFP();
     });
 
-    // Trigger API recompute when dataset changes
     d3.select("#dataset-selector").on("change", function() {
         updateDatasetSelectWidth();
         currentDatasetName = this.value;
@@ -263,23 +255,12 @@ document.addEventListener("DOMContentLoaded", () => {
         recomputeFP();
     });
 
-    // --- REAL-TIME ID SEARCH FUNCTION ---
     d3.select("#search-point-id").on("input", function() {
         const searchId = this.value.trim();
         
-        // Helper to reset and clear selection when input is empty or invalid
         const clearSearchSelection = () => {
             selectedPoint = null;
             brushedPointsGlobal = [];
-            d3.selectAll(".dot").style("opacity", 0.9);
-            d3.selectAll(".pc-line")
-              .style("opacity", 0.6)
-              .style("stroke-width", d => {
-                  const showAnon = d3.select("#show-anomalies").property("checked");
-                  return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
-              })
-              .style("stroke", d => getLineColor(d));
-            d3.selectAll(".link-group line").remove();
             resetAllHovers();
             updateLiveAnalytics([]); 
             if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
@@ -305,7 +286,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // --- FP CHECKBOXES (TRIGGER SLIDE-DOWN AND FILTER) ---
     d3.select("#hide-fp-pca").on("change", function() {
         d3.select("#fp-params-pca").classed("expanded", this.checked);
         applyFilters();
@@ -452,7 +432,6 @@ d3.selectAll("input[name='kmeansSource']").on("change", function() {
     redrawKMeansPlot();
 });
 
-// Event listener for the Sankey Mode Segemented Control
 d3.selectAll("input[name='sankeyMode']").on("change", function() {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     if (currentTab === '2d') {
@@ -523,24 +502,20 @@ function redrawKMeansPlot() {
     }
 }
 
-// --- FILTERS & ANOMALIES ---
+// Updated applyFilters: switches from "display: none" to "opacity: 0" for FP-hidden points to allow border-only
 function applyFilters() {
     const hideFpPca = d3.select("#hide-fp-pca").property("checked");
     const hideFpMds = d3.select("#hide-fp-mds").property("checked");
 
-    // --- DYNAMIC FP COUNT IN CHECKBOX LABELS ---
-    // Calculate ONLY the FPs that are currently active (not already hidden by Precision/Recall sliders)
     const countFpPca = dataset.filter(d => d.is_fp_pca && d.precision >= minPrecision && d.recall >= minRecall).length;
     const countFpMds = dataset.filter(d => d.is_fp_mds && d.precision >= minPrecision && d.recall >= minRecall).length;
 
-    // Update PCA Label dynamically
     const labelPca = d3.select("label[for='hide-fp-pca']");
     if (!labelPca.empty()) {
         const baseText = labelPca.text().replace(/\s*\(\d+\)$/, "");
         labelPca.text(hideFpPca ? `${baseText} (${countFpPca})` : baseText);
     }
 
-    // Update MDS Label dynamically
     const labelMds = d3.select("label[for='hide-fp-mds']");
     if (!labelMds.empty()) {
         const baseText = labelMds.text().replace(/\s*\(\d+\)$/, "");
@@ -549,22 +524,26 @@ function applyFilters() {
 
     d3.selectAll(".dot, .pc-line").each(function(d) {
         const self = d3.select(this);
-        let isFilteredOut = (d.precision < minPrecision || d.recall < minRecall);
-
-        if (self.classed("dot-pca") && hideFpPca && d.is_fp_pca) {
-            isFilteredOut = true;
-        }
+        let isGeneralFiltered = (d.precision < minPrecision || d.recall < minRecall);
         
-        if (self.classed("dot-mds") && hideFpMds && d.is_fp_mds) {
-            isFilteredOut = true;
-        }
+        let isFpFiltered = false;
+        if (self.classed("dot-pca") && hideFpPca && d.is_fp_pca) isFpFiltered = true;
+        if (self.classed("dot-mds") && hideFpMds && d.is_fp_mds) isFpFiltered = true;
+        if (self.classed("pc-line") && ((hideFpPca && d.is_fp_pca) || (hideFpMds && d.is_fp_mds))) isFpFiltered = true;
 
-        self.classed("filtered-out", isFilteredOut)
-            .style("display", isFilteredOut ? "none" : null)
-            .style("pointer-events", isFilteredOut ? "none" : "auto");
+        self.classed("filtered-fp", isFpFiltered);
+
+        if (isGeneralFiltered) {
+            self.classed("filtered-out", true).style("display", "none").style("pointer-events", "none");
+        } else {
+            self.classed("filtered-out", false).style("display", null)
+                .style("opacity", isFpFiltered ? 0 : 0.9)
+                .style("pointer-events", isFpFiltered ? "none" : "auto");
+        }
     });
         
     if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
+    else resetAllHovers();
     
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     if (currentTab === '2d') {
@@ -633,30 +612,15 @@ function toggleDiscrepancies(show) {
             });
         });
 
-        d3.selectAll(".dot.dot-pca:not(.filtered-out), .dot.dot-mds:not(.filtered-out)").style("opacity", 0.9);
-        d3.selectAll(".dot.dot-kmeans:not(.filtered-out)").style("opacity", d => d.is_anomaly ? 1.0 : 0.2);
-        d3.selectAll(".dot.dot-pca2d:not(.filtered-out)").style("opacity", d => d.pca_is_anomaly ? 1.0 : 0.2);
-        d3.selectAll(".dot.dot-mds2d:not(.filtered-out)").style("opacity", d => d.mds_is_anomaly ? 1.0 : 0.2);
-        
-        if (!selectedPoint) {
-            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", d => {
-                const showAnon = d3.select("#show-anomalies").property("checked");
-                return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
-            }).style("stroke", d => getLineColor(d));
-        }
+        // Trigger visual reset to apply the border-only fill rule
+        resetAllHovers();
 
         let activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
         if (!selectedPoint) updateConfusionMatrix(activePoints, currentTab);
         
     } else {
         allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
-        d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9);
-        if (!selectedPoint) {
-            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", d => {
-                const showAnon = d3.select("#show-anomalies").property("checked");
-                return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
-            }).style("stroke", d => getLineColor(d));
-        }
+        resetAllHovers();
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
         if (!selectedPoint && brushedPointsGlobal.length === 0) {
             if (currentTab === '2d') {
@@ -667,37 +631,6 @@ function toggleDiscrepancies(show) {
                 d3.select("#dynamic-panel-title").text("Live Analytics");
             }
         }
-    }
-    
-    if (selectedPoint) {
-        const currentTab = d3.select("input[name='mainTab']:checked").node().value;
-        const activeIds = new Set([selectedPoint.id, ...(selectedPoint.neighbors || [])]);
-        
-        d3.selectAll(".dot:not(.filtered-out)")
-            .style("opacity", p => {
-                if (p.id === selectedPoint.id) return 1;
-                if (currentTab === 'nd' && activeIds.has(p.id)) return 0.8;
-                return 0.1;
-            });
-            
-        d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("stroke", d => getLineColor(d)) 
-            .style("opacity", p => p.id === selectedPoint.id ? 1 : 0.05)
-            .style("stroke-width", p => p.id === selectedPoint.id ? 3 : 1.5);
-
-        if (currentTab === 'nd') {
-            d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === selectedPoint.id).raise();
-            d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
-        } else {
-            d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === selectedPoint.id).raise();
-            d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === selectedPoint.id).raise();
-        }
-        
-    } else if (brushedPointsGlobal.length > 0) {
-        dataset.forEach(d => {
-            const isSelected = brushedPointsGlobal.includes(d);
-            d3.selectAll(`.pt-${d.id}:not(.filtered-out)`).style("opacity", isSelected ? 0.9 : 0.15);
-        });
     }
 }
 
@@ -725,7 +658,12 @@ function updateSelection(d, skipNeighborGraph = false) {
         const activeIds = new Set([d.id, ...neighborIds]);
 
         d3.selectAll(".dot:not(.filtered-out)")
-            .style("opacity", p => p.id === d.id ? 1 : (activeIds.has(p.id) ? 0.8 : 0.1))
+            .style("opacity", p => {
+                const isFiltered = d3.select(`.pt-${p.id}`).classed("filtered-fp");
+                if (p.id === d.id) return 1;
+                if (activeIds.has(p.id)) return 0.8;
+                return isFiltered ? 0 : 0.1;
+            })
             .attr("d", function(p) {
                 return getSymbolPath(d3.select(this).attr("class"), p, p.id === d.id);
             })
@@ -752,6 +690,9 @@ function updateSelection(d, skipNeighborGraph = false) {
             drawNeighborGraph(d, neighborsData);
         }
 
+        // Run this to ensure accurate "transparent inside" styling
+        resetAllHovers();
+
     } else {
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
@@ -762,7 +703,11 @@ function updateSelection(d, skipNeighborGraph = false) {
         drawRadarChart(d);
 
         d3.selectAll(".dot:not(.filtered-out)")
-            .style("opacity", p => p.id === d.id ? 1 : 0.1)
+            .style("opacity", p => {
+                const isFiltered = d3.select(`.pt-${p.id}`).classed("filtered-fp");
+                if (p.id === d.id) return 1;
+                return isFiltered ? 0 : 0.1;
+            })
             .attr("d", function(p) {
                 return getSymbolPath(d3.select(this).attr("class"), p, p.id === d.id);
             })
@@ -779,6 +724,8 @@ function updateSelection(d, skipNeighborGraph = false) {
 
         const baseDataset = dataset.filter(p => p.precision >= minPrecision && p.recall >= minRecall);
         drawSankeyDiagram("#comparison-plot", baseDataset);
+        
+        resetAllHovers();
     }
 }
 
@@ -815,11 +762,6 @@ function handleBrush(event, brushObj, xKey, yKey) {
                 savedBrushExtent = null;
                 savedBrushSource = null;
             }
-            d3.selectAll(".dot:not(.filtered-out)").style("opacity", 0.9); 
-            d3.selectAll(".pc-line:not(.filtered-out)").style("opacity", 0.6).style("stroke-width", d => {
-                const showAnon = d3.select("#show-anomalies").property("checked");
-                return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
-            }).style("stroke", d => getLineColor(d));
             resetAllHovers(); 
             updateLiveAnalytics([]); 
         }
@@ -843,10 +785,10 @@ function handleBrush(event, brushObj, xKey, yKey) {
         const cy = brushObj.yScale(d[yKey]);
         const isSelected = x0 <= cx && cx <= x1 && y0 <= cy && cy <= y1;
         if (isSelected) selectedPoints.push(d);
-        d3.selectAll(`.pt-${d.id}:not(.filtered-out)`).style("opacity", isSelected ? 0.9 : 0.15);
     });
     
     brushedPointsGlobal = selectedPoints;
+    resetAllHovers();
     updateLiveAnalytics(selectedPoints);
 }
 
@@ -957,38 +899,8 @@ function enhanceColorModeSwitcher() {
 }
 
 function updateColors() {
-    const showAnon = d3.select("#show-anomalies").property("checked");
-
-    d3.selectAll(".dot").transition().duration(500)
-        .style("fill", function(d) {
-            const plotClass = d3.select(this).attr("class");
-            let isAnom = false;
-            
-            if (plotClass && plotClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
-            else if (plotClass && plotClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
-            else if (plotClass && plotClass.includes("kmeans")) isAnom = d.is_anomaly;
-
-            if (colorMode === 'original') return (showAnon && isAnom) ? 'var(--anomaly-color)' : colorOriginal(d.label);
-            return getColor(d);
-        })
-        .attr("d", function(d) {
-            return getSymbolPath(d3.select(this).attr("class"), d, (selectedPoint && selectedPoint.id === d.id));
-        });
-    
-    d3.selectAll(".pc-line").transition().duration(500)
-        .style("stroke", d => {
-            if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
-            return getColor(d);
-        })
-        .style("stroke-width", d => {
-            if (selectedPoint && selectedPoint.id === d.id) return 3;
-            return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
-        })
-        .style("opacity", d => {
-            if (selectedPoint) return d.id === selectedPoint.id ? 1 : 0.05;
-            if (brushedPointsGlobal && brushedPointsGlobal.length > 0) return brushedPointsGlobal.includes(d) ? 0.9 : 0.05;
-            return (showAnon && d.is_anomaly && colorMode === 'original') ? 0.9 : 0.6;
-        });
+    // Triggers color updates but ensures border-only rules stay intact
+    resetAllHovers();
 }
 
 function updateLegend() {
