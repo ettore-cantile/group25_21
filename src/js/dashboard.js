@@ -209,6 +209,9 @@ async function recomputeFP() {
     const k = parseInt(d3.select(".sync-k").node().value) || 15;
     const threshold = parseFloat(d3.select(".sync-thresh").node().value) || 0.8;
 
+    // 1. MOSTRA IL LOADER
+    d3.select("#global-loader").classed("hidden-panel", false);
+
     try {
         const response = await fetch(`${baseUrl}/api/compute_fp`, {
             method: 'POST',
@@ -235,6 +238,11 @@ async function recomputeFP() {
         
     } catch (err) {
         console.warn("API Error:", err);
+        // Opzionale: potresti mostrare un alert all'utente qui se l'API fallisce
+        // alert("Errore durante il calcolo dei falsi positivi.");
+    } finally {
+        // 2. NASCONDI IL LOADER (eseguito sempre, sia in caso di successo che di errore)
+        d3.select("#global-loader").classed("hidden-panel", true);
     }
 }
 
