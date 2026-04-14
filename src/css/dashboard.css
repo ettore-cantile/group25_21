@@ -453,7 +453,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     background-color: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
-    z-index: 9999; /* Deve stare sopra tutto */
+    z-index: 9999; /* Must be above everything */
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -469,7 +469,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     width: 60px;
     height: 60px;
     border: 6px solid rgba(255, 255, 255, 0.2);
-    /* Usa il colore azzurro/selezione per dare continuità al design */
+    /* Use the blue/selection color for design continuity */
     border-top: 6px solid var(--control-sel-text, #00d2ff); 
     border-radius: 50%;
     animation: spin 1s linear infinite;
