@@ -143,7 +143,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 .dataset-title-select {
     appearance: none; 
     -webkit-appearance: none; 
-    text-align: left;
+    text-align: center;
     -moz-appearance: none;
     min-width: 175px;
     background: var(--control-bg);
