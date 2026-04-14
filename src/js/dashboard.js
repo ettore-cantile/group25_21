@@ -267,6 +267,52 @@ document.addEventListener("DOMContentLoaded", () => {
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
 
+    // --- FUNZIONE DI RICERCA PUNTO PER ID (REAL-TIME) ---
+    d3.select("#search-point-id").on("input", function() {
+        const searchId = this.value.trim();
+        
+        // Helper per resettare e pulire la selezione quando l'input è vuoto o errato
+        const clearSearchSelection = () => {
+            selectedPoint = null;
+            brushedPointsGlobal = [];
+            d3.selectAll(".dot").style("opacity", 0.9);
+            d3.selectAll(".pc-line")
+              .style("opacity", 0.6)
+              .style("stroke-width", d => {
+                  const showAnon = d3.select("#show-anomalies").property("checked");
+                  return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+              })
+              .style("stroke", d => getLineColor(d));
+            d3.selectAll(".link-group line").remove();
+            resetAllHovers();
+            updateLiveAnalytics([]); 
+            if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
+        };
+
+        // Se l'utente cancella l'ID, resettiamo la dashboard
+        if (searchId === "") {
+            clearSearchSelection();
+            return;
+        }
+        
+        // Cerca il punto nel dataset in real-time
+        let targetPoint = null;
+        for (let d of dataset) {
+            if (String(d.id) === searchId) {
+                targetPoint = d;
+                break;
+            }
+        }
+
+        if (targetPoint) {
+            // Punto trovato, simula la selezione
+            updateSelection(targetPoint);
+        } else {
+            // Punto non trovato (magari sta ancora digitando), puliamo la selezione precedente
+            clearSearchSelection();
+        }
+    });
+
     d3.select("#hide-fp-pca").on("change", applyFilters);
     d3.select("#hide-fp-mds").on("change", applyFilters);
     
@@ -1190,6 +1236,7 @@ function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
     return d3.symbol().type(type).size(area)();
 }
 
+// Reverted resetAllHovers to the simpler, direct manipulation approach to match requested behavior
 function resetAllHovers() {
     const showAnon = d3.select("#show-anomalies").property("checked");
 
