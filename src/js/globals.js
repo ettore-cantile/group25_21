@@ -24,6 +24,10 @@ let savedBrushSource = null;
 const scalesMap = { pca: {}, mds: {}, kmeans: {}, pca2d: {}, mds2d: {} };
 let brushPCA, brushMDS, brushKMeans, brushPCA2D, brushMDS2D;
 
+// Parallel Coordinates Brush State
+let activePCBrushes = new Map(); // Tracks multiple active selections across different axes
+let pcBrushes = new Map(); // Stores the unique D3 brush instances for each axis
+
 // Radar Chart pre-calculated metrics
 let radarDimensions = [];
 let radarMinMax = {};
@@ -50,6 +54,15 @@ const gaugeAngleScale = d3.scaleLinear().domain([0, 1]).range([-Math.PI / 2, Mat
 
 
 // --- UTILITIES ---
+
+// Clears all Parallel Coordinates brushes safely and resyncs the tracking maps
+function clearPCBrushes() {
+    activePCBrushes.clear();
+    d3.selectAll(".pc-brush").each(function(f) {
+        const b = pcBrushes.get(f);
+        if (b) d3.select(this).call(b.move, null);
+    });
+}
 
 // Returns the stroke color based on whether anomalies are enabled and the active color mode
 function getLineColor(d) {
@@ -85,11 +98,10 @@ function getColor(d) {
     if (colorMode === 'fscore') return colorFScore(d.f_score);
 }
 
-// Updated tooltip function: shows only fundamental metrics (ID, Class, Prec, Recall, F-Score)
+// Shows fundamental metrics (ID, Class, Prec, Recall, F-Score)
 function showTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
     
-    // Renders only the core identifier and metrics in the tooltip body
     tooltip.html(`
         <strong style="color: var(--control-sel-text);">ID:</strong> ${d.id} | <strong style="color: var(--control-sel-text);">Class:</strong> ${d.label}<br>
         <strong style="color: var(--control-sel-text);">Precision:</strong> ${d.precision === 1 ? "100" : (d.precision*100).toFixed(1)}%<br>
@@ -102,7 +114,6 @@ function showTooltip(event, d) {
     const tooltipHeight = tooltipNode.offsetHeight;
     const margin = 20;
 
-    // Screen boundary logic to keep the tooltip within the viewport
     let x = event.pageX + margin;
     if (x + tooltipWidth > window.innerWidth) x = event.pageX - tooltipWidth - margin;
 
@@ -159,107 +170,103 @@ function updateDatasetSelectWidth() {
     document.body.removeChild(temp);
 }
 
-// Resets visual highlight and opacity across all plots, handling "border-only" style for filtered neighbors
+// --- MASTER VISUAL STATE CONTROLLER ---
+// Dynamically evaluates and applies Fill, Stroke, and Opacity to all points
 function resetAllHovers() {
     const showAnon = d3.select("#show-anomalies").property("checked");
     const showCentroids = d3.select("#show-discrepancies").property("checked");
+    const currentTab = d3.select("input[name='mainTab']:checked").node().value;
 
-    if (selectedPoint) {
-        const currentTab = d3.select("input[name='mainTab']:checked").node().value;
-        const neighborIds = selectedPoint.neighbors || [];
-        const activeIds = new Set([selectedPoint.id, ...neighborIds]);
+    d3.selectAll(".dot").each(function(p) {
+        const self = d3.select(this);
+        const isFilteredFP = self.classed("filtered-fp");
+        const plotClass = self.attr("class");
+        
+        let isAnom = false;
+        if (plotClass && plotClass.includes("pca2d")) isAnom = p.pca_is_anomaly;
+        else if (plotClass && plotClass.includes("mds2d")) isAnom = p.mds_is_anomaly;
+        else if (plotClass && plotClass.includes("kmeans")) isAnom = p.is_anomaly;
 
-        d3.selectAll(".dot")
-            .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, p.id === selectedPoint.id); })
-            .style("stroke", p => p.id === selectedPoint.id ? "var(--hover-stroke)" : "var(--dot-stroke)")
-            .style("stroke-width", p => p.id === selectedPoint.id ? 2 : 0.8)
-            .style("fill", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                // If point is hidden by FP filter but is selected or is a neighbor, show border only
-                if (isFiltered && activeIds.has(p.id)) return "transparent";
-                return getColor(p);
-            })
-            .style("opacity", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                if (p.id === selectedPoint.id) return 1;
-                if (currentTab === 'nd' && activeIds.has(p.id)) return 0.8;
-                return isFiltered ? 0 : 0.1;
-            });
+        let isHighlighted = false;
+        let targetOpacity = 0.9;
+        let isSelected = false;
 
-        d3.selectAll(".pc-line")
-            .style("stroke-width", p => p.id === selectedPoint.id ? 3 : 1.5)
-            .style("stroke", d => getLineColor(d))
-            .style("opacity", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                if (p.id === selectedPoint.id) return 1;
-                return isFiltered ? 0 : 0.05;
-            });
-
-    } else if (brushedPointsGlobal && brushedPointsGlobal.length > 0) {
-        d3.selectAll(".dot")
-            .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, false); })
-            .style("stroke", "var(--dot-stroke)")
-            .style("stroke-width", 0.8)
-            .style("fill", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                if (isFiltered && brushedPointsGlobal.includes(p)) return "transparent";
-                return getColor(p);
-            })
-            .style("opacity", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                if (brushedPointsGlobal.includes(p)) return 0.9;
-                return isFiltered ? 0 : 0.15;
-            });
-
-        d3.selectAll(".pc-line")
-            .style("stroke", d => getLineColor(d))
-            .style("opacity", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                if (brushedPointsGlobal.includes(p)) return 0.9;
-                return isFiltered ? 0 : 0.05;
-            });
-    } else {
-        d3.selectAll(".dot")
-            .attr("d", function(p) { return getSymbolPath(d3.select(this).attr("class"), p, false); })
-            .style("stroke", "var(--dot-stroke)")
-            .style("stroke-width", 0.8)
-            .style("fill", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                const plotClass = d3.select(this).attr("class");
-                // If it's an FP-hidden point targeted by a centroid line, make it transparent
-                let isTargetedByCentroid = false;
+        // Determine Selection/Highlight Context
+        if (selectedPoint) {
+            const activeIds = new Set([selectedPoint.id, ...(selectedPoint.neighbors || [])]);
+            isSelected = p.id === selectedPoint.id;
+            if (activeIds.has(p.id)) isHighlighted = true;
+            
+            if (isSelected) targetOpacity = 1;
+            else if (currentTab === 'nd' && isHighlighted) targetOpacity = 0.8;
+            else targetOpacity = 0.1;
+        } 
+        else if (brushedPointsGlobal && brushedPointsGlobal.length > 0) {
+            if (brushedPointsGlobal.includes(p)) {
+                isHighlighted = true;
+                targetOpacity = 0.9;
+            } else {
+                targetOpacity = 0.15;
+            }
+        } 
+        else {
+            if (showCentroids) {
                 if (plotClass && (plotClass.includes("kmeans") || plotClass.includes("pca2d") || plotClass.includes("mds2d"))) {
-                    isTargetedByCentroid = true;
-                }
-                if (isFiltered && showCentroids && isTargetedByCentroid) return "transparent";
-                return getColor(p);
-            })
-            .style("opacity", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                const plotClass = d3.select(this).attr("class");
-                
-                if (showCentroids) {
-                    let isTargetedByCentroid = false;
-                    if (plotClass && (plotClass.includes("kmeans") || plotClass.includes("pca2d") || plotClass.includes("mds2d"))) {
-                        isTargetedByCentroid = true;
+                    if (isAnom) {
+                        isHighlighted = true;
+                        targetOpacity = 1.0;
+                    } else {
+                        targetOpacity = 0.2;
                     }
-                    if (isTargetedByCentroid) {
-                        if (p.is_anomaly) return 1.0;
-                        if (isFiltered) return 0.8; // Bring back the opacity to show the border
-                        return 0.2;
-                    }
+                } else {
+                    targetOpacity = 0.9;
                 }
-                return isFiltered ? 0 : 0.9;
-            });
+            } else {
+                targetOpacity = 0.9;
+            }
+        }
 
-        d3.selectAll(".pc-line")
-            .style("stroke", d => getLineColor(d))
-            .style("stroke-width", p => (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5)
-            .style("opacity", function(p) {
-                const isFiltered = d3.select(this).classed("filtered-fp");
-                if (isFiltered) return 0;
-                return (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6;
-            });
-    }
+        // Calculate Base Colors
+        let baseColor = getColor(p);
+        if (colorMode === 'original' && showAnon && isAnom) baseColor = 'var(--anomaly-color)';
+
+        // --- GHOST POINT LOGIC --- 
+        const finalFill = (isFilteredFP && isHighlighted) ? "transparent" : baseColor;
+        const finalStroke = isSelected ? "var(--hover-stroke)" : (isFilteredFP && isHighlighted ? baseColor : "var(--dot-stroke)");
+        const finalStrokeWidth = isSelected ? 2 : (isFilteredFP && isHighlighted ? 1.5 : 0.8);
+        const finalOpacity = isFilteredFP ? (isHighlighted ? targetOpacity : 0) : targetOpacity;
+
+        self.attr("d", getSymbolPath(plotClass, p, isSelected))
+            .style("fill", finalFill)
+            .style("stroke", finalStroke)
+            .style("stroke-width", finalStrokeWidth)
+            .style("opacity", finalOpacity);
+    });
+
+    d3.selectAll(".pc-line").each(function(p) {
+        const self = d3.select(this);
+        const isFilteredFP = self.classed("filtered-fp");
+        
+        let targetOpacity = 0.6;
+        let sw = (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
+        let isHighlighted = false;
+
+        if (selectedPoint) {
+            if (p.id === selectedPoint.id) { targetOpacity = 1; sw = 3; isHighlighted = true; }
+            else { targetOpacity = 0.05; }
+        } else if (brushedPointsGlobal && brushedPointsGlobal.length > 0) {
+            if (brushedPointsGlobal.includes(p)) { targetOpacity = 0.9; isHighlighted = true; }
+            else { targetOpacity = 0.05; }
+        } else {
+            targetOpacity = (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6;
+        }
+
+        const finalOpacity = isFilteredFP ? (isHighlighted ? targetOpacity : 0) : targetOpacity;
+
+        self.style("stroke", getLineColor(p))
+            .style("stroke-width", sw)
+            .style("opacity", finalOpacity);
+    });
+
     hideTooltip();
 }

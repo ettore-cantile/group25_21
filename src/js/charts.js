@@ -14,21 +14,14 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
 
     svgRoot.on("mouseleave", resetAllHovers);
     
-    // Reset selection on background click (ignoring drag events)
+    // Reset selection on background click
     svgRoot.on("click", (event) => {
-        if (event.defaultPrevented) return; // Prevent triggering if it was a pan/drag
+        if (event.defaultPrevented) return; 
         selectedPoint = null;
         brushedPointsGlobal = [];
-        d3.selectAll(".dot").style("opacity", 0.9);
         
-        d3.selectAll(".pc-line")
-          .style("opacity", 0.6)
-          .style("stroke-width", d => {
-              const showAnon = d3.select("#show-anomalies").property("checked");
-              return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
-          })
-          .style("stroke", d => getLineColor(d));
-          
+        clearPCBrushes();
+        
         d3.selectAll(".link-group line").remove();
         resetAllHovers();
         updateLiveAnalytics([]); 
@@ -38,23 +31,18 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
     const innerWidth = Math.max(10, width - margin.left - margin.right);
     const innerHeight = Math.max(10, height - margin.top - margin.bottom);
 
-    // --- ZOOM PADDING FIX ---
-    // Calculate extents and add 5% padding so edge points are not cut off by the clip-path
     const xExtent = d3.extent(dataset, d => d[xKey]);
     const yExtent = d3.extent(dataset, d => d[yKey]);
     const xPadding = xExtent[0] === xExtent[1] ? 1 : (xExtent[1] - xExtent[0]) * 0.05;
     const yPadding = yExtent[0] === yExtent[1] ? 1 : (yExtent[1] - yExtent[0]) * 0.05;
 
-    // Create base scales with padded domains
     const xScale = d3.scaleLinear().domain([xExtent[0] - xPadding, xExtent[1] + xPadding]).nice().range([0, innerWidth]);
     const yScale = d3.scaleLinear().domain([yExtent[0] - yPadding, yExtent[1] + yPadding]).nice().range([innerHeight, 0]);
 
-    // Store both base and current scales for semantic zooming support
     scalesMap[plotId] = { xScale, yScale, currentXScale: xScale, currentYScale: yScale, xKey, yKey };
     brushObj.xScale = xScale;
     brushObj.yScale = yScale;
 
-    // Define a clip path to prevent points from rendering outside the axes bounds when zoomed
     svgRoot.append("defs").append("clipPath")
         .attr("id", `clip-${plotId}`)
         .append("rect")
@@ -64,27 +52,20 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
     const svg = svgRoot.append("g")
         .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Draw static axes wrappers
     const xAxisGroup = svg.append("g").attr("class", "x-axis").attr("transform", `translate(0,${innerHeight})`).call(d3.axisBottom(xScale).ticks(5));
     const yAxisGroup = svg.append("g").attr("class", "y-axis").call(d3.axisLeft(yScale).ticks(5));
 
-    // Create a zoomable view group with the clip path applied
     const view = svg.append("g").attr("clip-path", `url(#clip-${plotId})`);
 
-    // Layer ordering is critical: Centroids/Links -> Brush Overlay -> Dots (Dots must be top for hover tooltips)
     const centroidLayer = view.append("g").attr("class", "centroid-layer");
     const linkGroup = view.append("g").attr("class", "link-group");
     const brushGroup = view.append("g").attr("class", "brush-group");
     const dotsGroup = view.append("g").attr("class", "dots-group");
 
-    // Initialize Brush limits and logic
     brushObj.extent([[0, 0], [innerWidth, innerHeight]]);
-    
-    // Restrict brushing to Left Click ONLY, leaving Alt or Middle Click available for Pan
     brushObj.filter(event => !event.ctrlKey && !event.button && !event.altKey);
     brushGroup.call(brushObj);
 
-    // Draw Data Points
     dotsGroup.selectAll(".dot")
         .data(dataset)
         .enter().append("path")
@@ -125,24 +106,21 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
             updateSelection(d);
         });
 
-    // Semantic Zoom & Pan Configuration
     const zoom = d3.zoom()
         .scaleExtent([0.5, 20])
         .extent([[0, 0], [innerWidth, innerHeight]])
         .filter(event => {
-            if (event.type === 'wheel') return true; // Allow scroll wheel
-            if (event.type === 'mousedown' && (event.altKey || event.button === 1)) return true; // Allow Alt+Click or Middle Click for Panning
-            if (event.type === 'dblclick') return true; // Allow Double Click reset
+            if (event.type === 'wheel') return true; 
+            if (event.type === 'mousedown' && (event.altKey || event.button === 1)) return true; 
+            if (event.type === 'dblclick') return true; 
             return false;
         })
         .on("zoom", (event) => {
             const transform = event.transform;
             
-            // Rescale axes dynamically
             const newX = transform.rescaleX(xScale);
             const newY = transform.rescaleY(yScale);
 
-            // Update maps to ensure brush and external functions use zoomed coordinates
             scalesMap[plotId].currentXScale = newX;
             scalesMap[plotId].currentYScale = newY;
             brushObj.xScale = newX;
@@ -151,29 +129,24 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
             xAxisGroup.call(d3.axisBottom(newX).ticks(5));
             yAxisGroup.call(d3.axisLeft(newY).ticks(5));
 
-            // Move points fluidly without scaling their radius/stroke width
             dotsGroup.selectAll(".dot")
                 .attr("transform", d => `translate(${newX(d[xKey])},${newY(d[yKey])})`);
 
-            // Update discrepancy lines if active
             centroidLayer.selectAll(".centroid-link")
                 .attr("x1", data => newX(data.d[xKey]))
                 .attr("y1", data => newY(data.d[yKey]))
                 .attr("x2", data => newX(data.c.x))
                 .attr("y2", data => newY(data.c.y));
 
-            // Update cross icons for centroids
             centroidLayer.selectAll(".centroid-cross")
                 .attr("transform", c => `translate(${newX(c.x)}, ${newY(c.y)})`);
 
-            // Update neighbor graph connections
             linkGroup.selectAll("line")
                 .attr("x1", data => newX(data.source[xKey]))
                 .attr("y1", data => newY(data.source[yKey]))
                 .attr("x2", data => newX(data.target[xKey]))
                 .attr("y2", data => newY(data.target[yKey]));
 
-            // Clear visual brush selection box when zooming/panning to prevent visual drift artifacts
             if (event.sourceEvent && event.sourceEvent.type !== 'zoom') {
                 d3.select(`${containerSelector} .brush-group`).call(brushObj.move, null);
             }
@@ -181,13 +154,11 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
 
     svgRoot.call(zoom);
 
-    // Reset zoom on double click
     svgRoot.on("dblclick.zoom", () => {
         svgRoot.transition().duration(750).call(zoom.transform, d3.zoomIdentity);
     });
 }
 
-// Function to draw neighbor connections between selected data points
 function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
     const plotMapping = { pca: '#pca-plot', mds: '#mds-plot', kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
     const linkGroup = d3.select(`${plotMapping[plotId]} .link-group`);
@@ -195,7 +166,6 @@ function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
 
     const linesData = neighborIds.map(id => pointById.get(id)).filter(p => p && p.precision >= minPrecision && p.recall >= minRecall);
 
-    // Target elements explicitly map source & target data to support dynamic semantic zooming
     linkGroup.selectAll("line")
         .data(linesData)
         .enter().append("line")
@@ -206,10 +176,9 @@ function drawLines(plotId, sourceD, neighborIds, xKey, yKey, scales) {
         .style("stroke", target => target.label === sourceD.label ? "#2ca02c" : "var(--anomaly-color)") 
         .style("stroke-width", 1.5)
         .style("opacity", 0.6)
-        .datum(target => ({ source: sourceD, target: target })); // Bind both points for zooming calculations
+        .datum(target => ({ source: sourceD, target: target })); 
 }
 
-// Function to draw parallel coordinates mapping multi-dimensional data
 function drawParallelCoordinates(containerSelector) {
     const container = d3.select(containerSelector);
     if (container.empty()) return;
@@ -228,18 +197,13 @@ function drawParallelCoordinates(containerSelector) {
         .style("height", "100%");
 
     svgRoot.on("mouseleave", resetAllHovers);
+    
+    // Clear selections and brushes on click
     svgRoot.on("click", () => {
         selectedPoint = null;
         brushedPointsGlobal = [];
-        d3.selectAll(".dot").style("opacity", 0.9);
-
-        d3.selectAll(".pc-line")
-          .style("opacity", 0.6)
-          .style("stroke-width", d => {
-              const showAnon = d3.select("#show-anomalies").property("checked");
-              return (showAnon && d.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
-          })
-          .style("stroke", d => getLineColor(d));
+        
+        clearPCBrushes();
 
         d3.selectAll(".link-group line").remove();
         resetAllHovers();
@@ -318,6 +282,77 @@ function drawParallelCoordinates(containerSelector) {
         d3.select(this).call(d3.axisLeft(y[f]).ticks(5));
     });
 
+    // --- MULTI-AXIS PARALLEL COORDINATES BRUSHING ---
+    // Clear maps securely before registering new brushes
+    pcBrushes.clear();
+    activePCBrushes.clear();
+
+    const handlePCBrush = (event, feature) => {
+        // If human clicks on PC brush, forcefully clear scatter brushes
+        if (event.sourceEvent && event.sourceEvent.type === "mousedown") {
+            [brushPCA, brushMDS, brushKMeans, brushPCA2D, brushMDS2D].forEach(b => {
+                if (b) d3.selectAll(".brush-group").call(b.move, null);
+            });
+        }
+
+        // Register or clear the bounds for this specific axis
+        if (event.selection) {
+            activePCBrushes.set(feature, event.selection);
+        } else {
+            activePCBrushes.delete(feature);
+        }
+
+        // Skip logic if the brush was moved programmatically (like clicking on background to reset)
+        if (!event.sourceEvent) return; 
+
+        // If the user cleared the last active brush, reset the entire view
+        if (activePCBrushes.size === 0) {
+            if (event.type === "end" || event.type === "brush") {
+                selectedPoint = null;
+                brushedPointsGlobal = [];
+                resetAllHovers();
+                updateLiveAnalytics([]);
+            }
+            return;
+        }
+
+        selectedPoint = null;
+        let selectedPoints = [];
+        
+        // Logical AND Filter across all actively brushed axes
+        dataset.forEach(d => {
+            if (d.precision < minPrecision || d.recall < minRecall) return;
+            
+            let isSelected = true;
+            for (let [f, selection] of activePCBrushes.entries()) {
+                const val = +d.attributes[f];
+                const yPos = y[f](val);
+                // Skip invalid data or points outside the brush extents
+                if (isNaN(yPos) || yPos < selection[0] || yPos > selection[1]) {
+                    isSelected = false;
+                    break;
+                }
+            }
+            if (isSelected) selectedPoints.push(d);
+        });
+
+        brushedPointsGlobal = selectedPoints;
+        resetAllHovers();
+        updateLiveAnalytics(selectedPoints);
+    };
+
+    // Attach an independent brush instance to each axis to allow multi-axis intersection
+    axes.append("g")
+        .attr("class", "brush pc-brush")
+        .each(function(f) {
+            const b = d3.brushY()
+                .extent([[-12, 0], [12, innerHeight]])
+                .on("start brush end", (event) => handlePCBrush(event, f));
+            
+            pcBrushes.set(f, b);
+            d3.select(this).call(b);
+        });
+
     axes.append("text")
         .style("text-anchor", "middle")
         .attr("y", -15)
@@ -330,7 +365,6 @@ function drawParallelCoordinates(containerSelector) {
         .style("font-weight", "bold");
 }
 
-// Function to draw Sankey Flow Diagram comparing cluster agreements
 function drawSankeyDiagram(selector, activeData) {
     const container = d3.select(selector);
     if (container.empty()) return;
@@ -600,7 +634,6 @@ function drawSankeyDiagram(selector, activeData) {
         .text(d => `${d.name} (${d.value})`);
 }
 
-// Function to draw the analytical Radar Chart for displaying multi-dimensional point profile
 function drawRadarChart(point) {
     const container = d3.select("#radar-chart-svg-container");
     container.html(""); 
@@ -726,7 +759,6 @@ function drawRadarChart(point) {
         .style("fill", "var(--radar-point)");
 }
 
-// Function to draw local neighbor graph using D3 force physics simulation
 function drawNeighborGraph(centerNode, neighborNodes) {
     const svg = d3.select("#neighbor-graph-svg");
     svg.selectAll("*").remove();
@@ -788,7 +820,6 @@ function drawNeighborGraph(centerNode, neighborNodes) {
     });
 }
 
-// Function handling the drag logic for the neighbor network graph
 function drag(simulation, centerNode, size) {
     function dragstarted(event, d) {
         if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -809,7 +840,6 @@ function drag(simulation, centerNode, size) {
     return d3.drag().on("start", dragstarted).on("drag", dragged).on("end", dragended);
 }
 
-// Function for initial setup of small circular Gauges
 function initGauge(selector, gaugeObj) {
     const svg = d3.select(selector);
     const width = 100, height = 60;
@@ -823,7 +853,6 @@ function initGauge(selector, gaugeObj) {
     gaugeObj.foreground = g.append("path").datum({ endAngle: -Math.PI / 2 }).style("fill", "var(--correct-color)").attr("d", arcFg); 
 }
 
-// Function to transition Gauge arcs based on a selected metric value
 function updateGauge(gaugeObj, value, color, textSelector) {
     const safeValue = isNaN(value) ? 0 : value;
     const targetAngle = gaugeAngleScale(safeValue);
@@ -842,7 +871,6 @@ function updateGauge(gaugeObj, value, color, textSelector) {
         .style("fill", color); 
 }
 
-// Function that updates the dynamically generated confusion matrix tables
 function updateConfusionMatrix(activePoints, tabMode) {
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);

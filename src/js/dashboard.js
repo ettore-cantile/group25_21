@@ -15,6 +15,9 @@ function initDashboard(folder) {
     brushedPointsGlobal = [];
     pointById.clear();
     
+    activePCBrushes.clear();
+    pcBrushes.clear();
+    
     brushPCA = d3.brush();
     brushMDS = d3.brush();
     brushKMeans = d3.brush();
@@ -193,7 +196,6 @@ function initDashboard(folder) {
     });
 }
 
-// Function to dynamically call the Public Python microservice to compute False Positives
 async function recomputeFP() {
     const baseUrl = 'https://matteotwentywings.pythonanywhere.com';
     
@@ -261,6 +263,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const clearSearchSelection = () => {
             selectedPoint = null;
             brushedPointsGlobal = [];
+            clearPCBrushes();
             resetAllHovers();
             updateLiveAnalytics([]); 
             if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
@@ -494,15 +497,11 @@ function redrawKMeansPlot() {
     if (selectedPoint) {
         updateSelection(selectedPoint, true);
     } else if (brushedPointsGlobal.length > 0) {
-        dataset.forEach(d => {
-            const isSelected = brushedPointsGlobal.includes(d);
-            d3.selectAll(`.pt-${d.id}:not(.filtered-out)`).style("opacity", isSelected ? 0.9 : 0.15);
-        });
         updateLiveAnalytics(brushedPointsGlobal); 
     }
 }
 
-// Updated applyFilters: switches from "display: none" to "opacity: 0" for FP-hidden points to allow border-only
+// Applies logical filters and sets CSS classes. Defers visual rendering to resetAllHovers.
 function applyFilters() {
     const hideFpPca = d3.select("#hide-fp-pca").property("checked");
     const hideFpMds = d3.select("#hide-fp-mds").property("checked");
@@ -536,14 +535,14 @@ function applyFilters() {
         if (isGeneralFiltered) {
             self.classed("filtered-out", true).style("display", "none").style("pointer-events", "none");
         } else {
-            self.classed("filtered-out", false).style("display", null)
-                .style("opacity", isFpFiltered ? 0 : 0.9)
-                .style("pointer-events", isFpFiltered ? "none" : "auto");
+            self.classed("filtered-out", false).style("display", null).style("pointer-events", isFpFiltered ? "none" : "auto");
         }
     });
+
+    // Delegate visual styling to the master controller
+    resetAllHovers();
         
     if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
-    else resetAllHovers();
     
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     if (currentTab === '2d') {
@@ -592,6 +591,7 @@ function toggleDiscrepancies(show) {
             });
 
             dataset.forEach(d => {
+                // Skips general filters but allows drawing links to FP-hidden points
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
                 
@@ -643,9 +643,20 @@ function updateSelection(d, skipNeighborGraph = false) {
     [brushPCA, brushMDS, brushKMeans, brushPCA2D, brushMDS2D].forEach(b => {
         d3.selectAll(".brush-group").call(b.move, null);
     });
+    
+    clearPCBrushes();
 
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
+
+    // Apply master visual changes
+    resetAllHovers();
+
+    // Bring targeted elements to the front to avoid overlap issues
+    const neighborIds = d.neighbors || [];
+    const activeIds = new Set([d.id, ...neighborIds]);
+    d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
+    d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
 
     if (currentTab === 'nd') {
         d3.select("#dynamic-panel-title").text("Neighbor Graph");
@@ -653,29 +664,6 @@ function updateSelection(d, skipNeighborGraph = false) {
         d3.select("#radar-chart-container").classed("hidden-panel", true);
         d3.select("#neighbor-graph-container").classed("hidden-panel", false);
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
-
-        const neighborIds = d.neighbors || [];
-        const activeIds = new Set([d.id, ...neighborIds]);
-
-        d3.selectAll(".dot:not(.filtered-out)")
-            .style("opacity", p => {
-                const isFiltered = d3.select(`.pt-${p.id}`).classed("filtered-fp");
-                if (p.id === d.id) return 1;
-                if (activeIds.has(p.id)) return 0.8;
-                return isFiltered ? 0 : 0.1;
-            })
-            .attr("d", function(p) {
-                return getSymbolPath(d3.select(this).attr("class"), p, p.id === d.id);
-            })
-            .style("stroke-width", p => p.id === d.id ? 2 : 0.8);
-
-        d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("stroke", p => getLineColor(p)) 
-            .style("opacity", p => p.id === d.id ? 1 : 0.05)
-            .style("stroke-width", p => p.id === d.id ? 3 : 1.5);
-
-        d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
-        d3.selectAll(".dot:not(.filtered-out)").filter(p => activeIds.has(p.id)).raise();
 
         const kmeansXKey = scalesMap['kmeans'].xKey;
         const kmeansYKey = scalesMap['kmeans'].yKey;
@@ -701,25 +689,6 @@ function updateSelection(d, skipNeighborGraph = false) {
         d3.select("#dynamic-panel-title").text("Multidimensional Profile (Radar)");
 
         drawRadarChart(d);
-
-        d3.selectAll(".dot:not(.filtered-out)")
-            .style("opacity", p => {
-                const isFiltered = d3.select(`.pt-${p.id}`).classed("filtered-fp");
-                if (p.id === d.id) return 1;
-                return isFiltered ? 0 : 0.1;
-            })
-            .attr("d", function(p) {
-                return getSymbolPath(d3.select(this).attr("class"), p, p.id === d.id);
-            })
-            .style("stroke-width", p => p.id === d.id ? 2 : 0.8);
-
-        d3.selectAll(".pc-line:not(.filtered-out)")
-            .style("stroke", p => getLineColor(p)) 
-            .style("opacity", p => p.id === d.id ? 1 : 0.05)
-            .style("stroke-width", p => p.id === d.id ? 3 : 1.5);
-
-        d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
-        d3.selectAll(".dot:not(.filtered-out)").filter(p => p.id === d.id).raise();
         d3.selectAll(".link-group line").remove();
 
         const baseDataset = dataset.filter(p => p.precision >= minPrecision && p.recall >= minRecall);
@@ -727,6 +696,8 @@ function updateSelection(d, skipNeighborGraph = false) {
         
         resetAllHovers();
     }
+    
+    updateLiveAnalytics([d]);
 }
 
 function setupBrushing() {
@@ -744,6 +715,8 @@ function setupBrushing() {
                 brushList.filter(b => b.obj !== brush).forEach(b => {
                     d3.select(`${b.sel} .brush-group`).call(b.obj.move, null);
                 });
+                
+                clearPCBrushes();
             }
             handleBrush(event, brush, scalesMap[plotId].xKey, scalesMap[plotId].yKey);
         });
