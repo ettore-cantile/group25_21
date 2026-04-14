@@ -92,12 +92,14 @@ function initDashboard(folder) {
 
     const basePath = `../json/${folder}/`;
 
+    // Added a fetch for the false positives data, catching errors so it doesn't break if missing
     Promise.all([
         d3.json(`${basePath}step2_final_data.json?v=${Date.now()}`),
         d3.csv(`../../dataset/${folder}.csv`),
         d3.json(`${basePath}kmeans_results.json?v=${Date.now()}`),
-        d3.json(`${basePath}kmeans_2d_results.json?v=${Date.now()}`)
-    ]).then(([data, csvData, kmeansData, kmeans2dData]) => {
+        d3.json(`${basePath}kmeans_2d_results.json?v=${Date.now()}`),
+        d3.json(`${basePath}step_fp_results.json?v=${Date.now()}`).catch(() => null)
+    ]).then(([data, csvData, kmeansData, kmeans2dData, fpData]) => {
         
         if (csvData && csvData.length > 0) {
             const allKeys = Object.keys(csvData[0]);
@@ -112,6 +114,10 @@ function initDashboard(folder) {
         const kmeans2dMap = new Map();
         if(kmeans2dData?.points) kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
 
+        // Create sets from the loaded False Positive data to allow O(1) lookups per point
+        const fpPcaSet = new Set(fpData?.false_positive_points_pca || []);
+        const fpMdsSet = new Set(fpData?.false_positive_points_mds || []);
+
         const formatLabel = (str) => {
             if (!str || str === "undefined") return "Unknown";
             return String(str).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -121,6 +127,10 @@ function initDashboard(folder) {
             if (csvData[i]) p.attributes = csvData[i];
 
             p.label = formatLabel(p.label);
+            
+            // Assign False Positive flags to the dataset objects
+            p.is_fp_pca = fpPcaSet.has(p.id);
+            p.is_fp_mds = fpMdsSet.has(p.id);
             
             const kData = kmeansMap.get(p.id);
             if(kData) {
@@ -246,6 +256,10 @@ document.addEventListener("DOMContentLoaded", () => {
     initGauge("#gauge-recall", gauges.recall);
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
+
+    // Attach event listeners for the newly added Hide FP toggles
+    d3.select("#hide-fp-pca").on("change", applyFilters);
+    d3.select("#hide-fp-mds").on("change", applyFilters);
     
     const themeToggle = document.getElementById('theme-toggle');
     if (themeToggle) {
@@ -568,10 +582,31 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
 }
 
 function applyFilters() {
-    d3.selectAll(".dot, .pc-line")
-        .classed("filtered-out", d => d.precision < minPrecision || d.recall < minRecall)
-        .style("display", d => (d.precision < minPrecision || d.recall < minRecall) ? "none" : null)
-        .style("pointer-events", d => (d.precision < minPrecision || d.recall < minRecall) ? "none" : "auto");
+    // Read the current state of both the FP toggle checkboxes
+    const hideFpPca = d3.select("#hide-fp-pca").property("checked");
+    const hideFpMds = d3.select("#hide-fp-mds").property("checked");
+
+    d3.selectAll(".dot, .pc-line").each(function(d) {
+        const self = d3.select(this);
+        
+        // Default filter check for min precision/recall
+        let isFilteredOut = (d.precision < minPrecision || d.recall < minRecall);
+
+        // Hide specific False Positive points within the PCA plot dynamically without modifying scale
+        if (self.classed("dot-pca") && hideFpPca && d.is_fp_pca) {
+            isFilteredOut = true;
+        }
+        
+        // Hide specific False Positive points within the MDS plot dynamically without modifying scale
+        if (self.classed("dot-mds") && hideFpMds && d.is_fp_mds) {
+            isFilteredOut = true;
+        }
+
+        // Apply visual updates based on final filtering state
+        self.classed("filtered-out", isFilteredOut)
+            .style("display", isFilteredOut ? "none" : null)
+            .style("pointer-events", isFilteredOut ? "none" : "auto");
+    });
         
     if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
     
@@ -930,6 +965,13 @@ function handleBrush(event, brushObj, xKey, yKey) {
     
     dataset.forEach(d => {
         if(d.precision < minPrecision || d.recall < minRecall) return;
+        
+        // Hide brushed points locally as well if false positive filter is activated
+        const hideFpPca = d3.select("#hide-fp-pca").property("checked");
+        const hideFpMds = d3.select("#hide-fp-mds").property("checked");
+        if (brushObj === brushPCA && hideFpPca && d.is_fp_pca) return;
+        if (brushObj === brushMDS && hideFpMds && d.is_fp_mds) return;
+
         const cx = brushObj.xScale(d[xKey]);
         const cy = brushObj.yScale(d[yKey]);
         const isSelected = x0 <= cx && cx <= x1 && y0 <= cy && cy <= y1;
@@ -1246,13 +1288,13 @@ function resetAllHovers() {
                         self.attr("d", nextD)
                             .style("stroke", "var(--dot-stroke)")
                             .style("stroke-width", 0.8)
-                            .transition().duration(150).style("opacity", targetOpacity); // Usa targetOpacity
+                            .transition().duration(150).style("opacity", targetOpacity); 
                     });
             } else {
                 self.transition().duration(300)
                     .style("stroke", "var(--dot-stroke)")
                     .style("stroke-width", 0.8)
-                    .style("opacity", targetOpacity); // Usa targetOpacity
+                    .style("opacity", targetOpacity); 
             }
         });
         
