@@ -203,13 +203,13 @@ function initDashboard(folder) {
 
 // Function to dynamically call the Public/Local Python microservice to compute False Positives
 async function recomputeFP() {
-    // Utilize the flag set in globals.js to switch environment seamlessly
+    // Use the flag set in globals.js to switch environment seamlessly
     const baseUrl = USE_LOCAL_API ? LOCAL_API_URL : PUBLIC_API_URL;
     
     const k = parseInt(d3.select(".sync-k").node().value) || 15;
     const threshold = parseFloat(d3.select(".sync-thresh").node().value) || 0.8;
 
-    // 1. MOSTRA IL LOADER
+    // 1. SHOW THE LOADER
     d3.select("#global-loader").classed("hidden-panel", false);
 
     try {
@@ -238,10 +238,10 @@ async function recomputeFP() {
         
     } catch (err) {
         console.warn("API Error:", err);
-        // Opzionale: potresti mostrare un alert all'utente qui se l'API fallisce
-        // alert("Errore durante il calcolo dei falsi positivi.");
+        // Optional: you could show an alert to the user here if the API fails
+        // alert("Error during false positive computation.");
     } finally {
-        // 2. NASCONDI IL LOADER (eseguito sempre, sia in caso di successo che di errore)
+        // 2. HIDE THE LOADER (always executed, both on success and error)
         d3.select("#global-loader").classed("hidden-panel", true);
     }
 }
