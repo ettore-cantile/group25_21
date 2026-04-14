@@ -1,0 +1,12 @@
+{
+    "metadata": {
+        "dataset": "iris.csv",
+        "k_neighbors": 15,
+        "min_mismatch_pct": 0.8,
+        "total_samples": 150,
+        "num_fp_points_pca": 0,
+        "num_fp_points_mds": 0
+    },
+    "false_positive_points_pca": [],
+    "false_positive_points_mds": []
+}

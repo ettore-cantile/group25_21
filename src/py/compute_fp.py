@@ -1,10 +1,12 @@
 import os
 import json
+import argparse
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import pdist, squareform
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from sklearn.manifold import MDS
 
 # --- CONFIGURATION ---
 DATASETS = ["wine", "iris", "user_knowledge"]
@@ -16,66 +18,43 @@ LABEL_INDEX = {
     "user_knowledge": -1
 }
 
-K_NEIGHBORS = 15
-
-
-def compute_false_positive_points(X):
+def calculate_fp_metrics(nn_orig, X_proj, k_effective, min_mismatch_pct):
     """
-    Compute local false positive points (Victims) introduced by PCA.
-    Returns the FP points, the FP rates, and the lists of neighbors in HD and 2D.
+    Given the original k-NN indices and a 2D projection, 
+    calculates the False Positive points, rates, and 2D neighbors.
     """
-    n_samples = X.shape[0]
+    n_samples = X_proj.shape[0]
 
-    # Standardize
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    # Distance matrix for the projection
+    D_proj = squareform(pdist(X_proj, metric='euclidean'))
+    
+    # k-NN indices in 2D
+    nn_proj = np.argsort(D_proj, axis=1)[:, 1:k_effective+1]
 
-    # PCA projection (2D)
-    X_pca = PCA(n_components=2).fit_transform(X_scaled)
-
-    # Distance matrices
-    D_orig = squareform(pdist(X_scaled, metric='euclidean'))
-    D_pca = squareform(pdist(X_pca, metric='euclidean'))
-
-    # Sicurezza per dataset piccoli
-    k_effettivo = min(K_NEIGHBORS, n_samples - 2)
-
-    # k-NN indices (indici dei k-vicini)
-    nn_orig = np.argsort(D_orig, axis=1)[:, 1:k_effettivo+1]
-    nn_pca = np.argsort(D_pca, axis=1)[:, 1:k_effettivo+1]
-
-    # Vettore per il rate delle Vittime
     FP_rate = np.zeros(n_samples)
 
     for i in range(n_samples):
         set_orig = set(nn_orig[i])
-        set_pca = set(nn_pca[i])
+        set_proj = set(nn_proj[i])
 
-        # Quali punti circondano il punto i nel 2D ma NON nell'originale?
-        falsi_vicini_di_i = set_pca - set_orig
-        
-        # Punteggio da 0.0 (tutti amici veri) a 1.0 (tutti estranei)
-        FP_rate[i] = len(falsi_vicini_di_i) / k_effettivo
+        # False neighbors: points in 2D neighborhood that are NOT in HD neighborhood
+        false_neighbors_of_i = set_proj - set_orig
+        FP_rate[i] = len(false_neighbors_of_i) / k_effective
 
-    # Calcolo soglia dinamica per evidenziare solo i punti visibilmente peggiori
-    media_errore = np.mean(FP_rate)
-    soglia_dinamica = np.percentile(FP_rate, 95) # Prendi il top 10% peggiore
-    
-    fp_points = np.where((FP_rate >= soglia_dinamica) & (FP_rate > media_errore))[0]
+    # Thresholding
+    fp_points = np.where(FP_rate >= min_mismatch_pct)[0]
 
-    # Restituiamo anche le matrici dei vicini convertite in liste Python (.tolist()) 
-    # per la serializzazione JSON
-    return fp_points.tolist(), FP_rate.tolist(), nn_orig.tolist(), nn_pca.tolist()
+    return fp_points.tolist()
 
 
-def process_dataset(dataset_name):
+def process_dataset(dataset_name, k_neighbors, min_mismatch_pct):
     print(f"\n--- Processing FP for: {dataset_name.upper()} ---")
 
     dataset_path = os.path.join(BASE_DIR, '..', '..', 'dataset', f'{dataset_name}.csv')
     output_dir = os.path.join(BASE_DIR, '..', 'json', dataset_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    output_file = os.path.join(output_dir, 'step_fp_pca.json')
+    output_file = os.path.join(output_dir, 'step_fp_results.json')
 
     if not os.path.exists(dataset_path):
         print(f"Error: Dataset {dataset_path} not found. Skipping.")
@@ -83,44 +62,68 @@ def process_dataset(dataset_name):
 
     # Load dataset
     df = pd.read_csv(dataset_path)
-
-    # Extract labels and features
     target_idx = LABEL_INDEX.get(dataset_name, -1)
-    labels = df.iloc[:, target_idx].values
     X = df.drop(df.columns[target_idx], axis=1).values
+    n_samples = X.shape[0]
 
-    # Compute FP points and neighbors
-    fp_points, fp_rates, nn_orig_list, nn_pca_list = compute_false_positive_points(X)
+    # 1. STANDARDIZATION & HD BASELINE (Computed only once)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    D_orig = squareform(pdist(X_scaled, metric='euclidean'))
+    effective_k = min(k_neighbors, n_samples - 2)
+    nn_orig = np.argsort(D_orig, axis=1)[:, 1:effective_k+1]
 
-    # Build per-point structure
-    points_data = []
-    for i in range(len(X)):
-        points_data.append({
-            "id": i,
-            "label": str(labels[i]),
-            "fp_rate": round(fp_rates[i], 6),
-            "is_false_positive": i in fp_points,
-            "neighbors_hd": nn_orig_list[i],  # Aggiunta: lista id vicini HD
-            "neighbors_2d": nn_pca_list[i]    # Aggiunta: lista id vicini 2D
-        })
+    # 2. PCA PROJECTION
+    print("  -> Computing PCA...")
+    X_pca = PCA(n_components=2).fit_transform(X_scaled)
+    pca_fp_pts = calculate_fp_metrics(nn_orig, X_pca, effective_k, min_mismatch_pct)
 
-    # Output JSON
+    # 3. MDS PROJECTION (random_state set for reproducibility)
+    print("  -> Computing MDS...")
+    X_mds = MDS(n_components=2, normalized_stress='auto', random_state=42).fit_transform(X_scaled)
+    mds_fp_pts = calculate_fp_metrics(nn_orig, X_mds, effective_k, min_mismatch_pct)
+
+    # 4. BUILD SIMPLIFIED JSON STRUCTURE
     output_data = {
         "metadata": {
             "dataset": f"{dataset_name}.csv",
-            "k_neighbors": min(K_NEIGHBORS, len(X) - 2),
-            "num_fp_points": len(fp_points)
+            "k_neighbors": effective_k,
+            "min_mismatch_pct": min_mismatch_pct,
+            "total_samples": n_samples,
+            "num_fp_points_pca": len(pca_fp_pts),
+            "num_fp_points_mds": len(mds_fp_pts)
         },
-        "false_positive_points": fp_points,
-        "points": points_data
+        "false_positive_points_pca": pca_fp_pts,
+        "false_positive_points_mds": mds_fp_pts
     }
 
     with open(output_file, 'w') as f:
         json.dump(output_data, f, indent=4)
 
     print(f"Saved: {output_file}")
+    print(f"  - FP Found (PCA): {len(pca_fp_pts)}")
+    print(f"  - FP Found (MDS): {len(mds_fp_pts)}")
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Calculate the False Positives introduced by PCA and MDS.")
+    parser.add_argument(
+        "--k", 
+        type=int, 
+        default=15, 
+        help="Number of neighbors (k) to consider. Default: 15"
+    )
+    parser.add_argument(
+        "--threshold", 
+        type=float, 
+        default=0.8, 
+        help="Minimum mismatch threshold (0.0 to 1.0) to declare a point as a False Positive. Example: 0.6 = 60%. Default: 0.8"
+    )
+    
+    args = parser.parse_args()
+
+    print(f"Starting script with K={args.k} and Mismatch Threshold={args.threshold * 100}%")
+
     for ds in DATASETS:
-        process_dataset(ds)
+        process_dataset(ds, args.k, args.threshold)

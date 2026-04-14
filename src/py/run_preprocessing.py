@@ -3,6 +3,7 @@ import sys
 
 # List of the scripts in the original order
 original_scripts = [
+    "compute_fp.py",
     "compute_kmeans_2d.py",
     "compute_kmeans.py",
     "compute_projection.py",
