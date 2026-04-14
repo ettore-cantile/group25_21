@@ -201,9 +201,10 @@ function initDashboard(folder) {
     });
 }
 
-// Function to dynamically call the Public Python microservice to compute False Positives
+// Function to dynamically call the Public/Local Python microservice to compute False Positives
 async function recomputeFP() {
-    const baseUrl = 'https://matteotwentywings.pythonanywhere.com';
+    // Utilize the flag set in globals.js to switch environment seamlessly
+    const baseUrl = USE_LOCAL_API ? LOCAL_API_URL : PUBLIC_API_URL;
     
     const k = parseInt(d3.select(".sync-k").node().value) || 15;
     const threshold = parseFloat(d3.select(".sync-thresh").node().value) || 0.8;
@@ -597,6 +598,7 @@ function toggleDiscrepancies(show) {
             });
 
             dataset.forEach(d => {
+                // Skips general filters but allows drawing links to FP-hidden points
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
                 
@@ -877,6 +879,7 @@ function enhanceColorModeSwitcher() {
 }
 
 function updateColors() {
+    // Triggers color updates but ensures border-only rules stay intact
     resetAllHovers();
 }
 
