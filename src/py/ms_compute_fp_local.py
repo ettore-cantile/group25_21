@@ -6,6 +6,7 @@ from scipy.spatial.distance import pdist, squareform
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS
+from flask_cors import CORS
 
 # --- CONFIGURATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -19,6 +20,7 @@ LABEL_INDEX = {
 }
 
 app = Flask(__name__)
+CORS(app)
 
 def calculate_fp_metrics(nn_orig, X_proj, k_effective, min_mismatch_pct):
     """

@@ -196,8 +196,10 @@ function initDashboard(folder) {
     });
 }
 
+// Function to dynamically call the Public/Local Python microservice to compute False Positives
 async function recomputeFP() {
-    const baseUrl = 'https://matteotwentywings.pythonanywhere.com';
+    // Utilize the flag set in globals.js to switch environment seamlessly
+    const baseUrl = USE_LOCAL_API ? LOCAL_API_URL : PUBLIC_API_URL;
     
     const k = parseInt(d3.select(".sync-k").node().value) || 15;
     const threshold = parseFloat(d3.select(".sync-thresh").node().value) || 0.8;
