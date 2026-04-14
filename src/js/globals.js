@@ -1,95 +1,64 @@
-// --- GLOBAL STATE ---
+// --- GLOBAL STATE & CONFIGURATION ---
 
-// Main dataset array
+// Core data and state variables
 let dataset = [];
-// Metadata object for global metrics
 let metadata = {};
-// Current color mode for visualizations
 let colorMode = 'original';
-// Array of unique classes in the dataset
 let uniqueClasses = [];
-// Map to quickly access points by their ID
 let pointById = new Map();
-// Default visual size for data points
 let currentPointSize = 3.5;
-// Currently selected data point
 let selectedPoint = null;
-// Array of points selected via brush interactions
-let brushedPointsGlobal = []; 
-// Source projection for KMeans ('pca' or 'mds')
-let kmeansProjectionSource = 'pca'; 
-// Name of the currently active dataset
+let brushedPointsGlobal = [];
+let kmeansProjectionSource = 'pca';
 let currentDatasetName = "wine";
 
-// Filters
-// Minimum precision value filter
+// Active filters
 let minPrecision = 0;
-// Minimum recall value filter
 let minRecall = 0;
 
-// Saved boundaries of the active brush
+// Brush state
 let savedBrushExtent = null;
-// Identifier for the chart where the brush is active
 let savedBrushSource = null;
 
-// Scales Storage
-// Map storing D3 scales for X and Y axes across all plots
+// Plot scales and brushes storage
 const scalesMap = { pca: {}, mds: {}, kmeans: {}, pca2d: {}, mds2d: {} };
-
-// D3 Brushes
-// D3 brush instances for each scatter plot
 let brushPCA, brushMDS, brushKMeans, brushPCA2D, brushMDS2D;
 
-// Radar Chart Data
-// Keys for the attributes used in the radar chart
+// Radar Chart pre-calculated metrics
 let radarDimensions = [];
-// Minimum and maximum values for each radar dimension
 let radarMinMax = {};
-// Average attribute values for the original ground-truth clusters
 let origClusterAvg = {};
-// Average attribute values for PCA KMeans clusters
-let pcaKmeansAvg = {}; 
-// Average attribute values for MDS KMeans clusters
+let pcaKmeansAvg = {};
 let mdsKmeansAvg = {};
 
-// Color Scales
-// Custom Tableau 10 color scheme array
+// Color Scales Configuration
 const customTableau = [...d3.schemeTableau10];
-customTableau[2] = '#2ca02c'; 
-customTableau[3] = '#9b59b6'; 
+customTableau[2] = '#2ca02c';
+customTableau[3] = '#9b59b6';
 
-// Ordinal color scale for ground-truth classes
 const colorOriginal = d3.scaleOrdinal(customTableau);
-// Discrete color palette for precision (blues)
 const bluesDiscrete = ["#08519c", "#3182bd", "#6baed6", "#9ecae1", "#c6dbef"];
-// Quantize scale mapping precision values to blue colors
-const colorPrecision = d3.scaleQuantize().domain([0, 1]).range(bluesDiscrete); 
-// Discrete color palette for recall (reds)
+const colorPrecision = d3.scaleQuantize().domain([0, 1]).range(bluesDiscrete);
 const redsDiscrete = ["#67000d", "#cb181d", "#fb6a4a", "#fcae91", "#fee5d9"];
-// Quantize scale mapping recall values to red colors
 const colorRecall = d3.scaleQuantize().domain([0, 1]).range(redsDiscrete);
-// Discrete color palette for F-Score (red to green)
 const rdYlGnDiscrete = ["#d73027", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"];
-// Quantize scale mapping F-Score values to red-yellow-green colors
 const colorFScore = d3.scaleQuantize().domain([0, 1]).range(rdYlGnDiscrete);
 
-// Gauges
-// Configuration objects storing foreground elements for gauges
+// Gauges Configuration
 const gauges = { precision: { foreground: null }, recall: { foreground: null }, fscore: { foreground: null } };
-// Linear scale to map metric values (0-1) to gauge angles
 const gaugeAngleScale = d3.scaleLinear().domain([0, 1]).range([-Math.PI / 2, Math.PI / 2]);
 
 
 // --- UTILITIES ---
 
-// Function to determine the stroke color for lines based on the active color mode
+// Returns the stroke color based on whether anomalies are enabled and the active color mode
 function getLineColor(d) {
     const showAnon = d3.select("#show-anomalies").property("checked");
     if (colorMode === 'original') return (showAnon && d.is_anomaly) ? 'var(--anomaly-color)' : colorOriginal(d.label);
     return getColor(d);
 }
 
-// Function to generate the SVG path for data points (circle or triangle for anomalies)
+// Generates the SVG path string for a point, handles anomaly triangles and hover scaling
 function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
     const showAnon = d3.select("#show-anomalies").property("checked");
     let isAnom = false;
@@ -100,7 +69,7 @@ function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
     
     let r = currentPointSize;
     if (overrideR !== null) r = overrideR;
-    else if (isHovered) r = currentPointSize * 2.0; 
+    else if (isHovered) r = currentPointSize * 2.0;
     
     const area = Math.PI * Math.pow(r, 2) * ((showAnon && isAnom) ? 1.5 : 1);
     const type = (showAnon && isAnom) ? d3.symbolTriangle : d3.symbolCircle;
@@ -108,7 +77,7 @@ function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
     return d3.symbol().type(type).size(area)();
 }
 
-// Function to determine the fill color of a point based on the active color mode
+// Maps data metrics to specific color scales based on the current UI mode
 function getColor(d) {
     if (colorMode === 'original') return colorOriginal(d.label);
     if (colorMode === 'precision') return colorPrecision(d.precision);
@@ -116,31 +85,16 @@ function getColor(d) {
     if (colorMode === 'fscore') return colorFScore(d.f_score);
 }
 
-// Function to display the standard tooltip with precision, recall, and F-Score data
+// Updated tooltip function: shows only fundamental metrics (ID, Class, Prec, Recall, F-Score)
 function showTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
     
-    let fpText = d.precision < 0.9 
-        ? `🔴 <span style="color: var(--control-sel-text); font-style: italic; font-weight: bold;">False Positive:</span> Attracts <span style="font-weight: bold;">${((1 - d.precision)*100).toFixed(1)}%</span> of points from other classes.` 
-        : `🟢 <span style="color: var(--control-sel-text); font-style: italic; font-weight: bold;">Low FPs:</span> No class mixing.`;
-        
-    let fnText = d.recall < 0.9 
-        ? `🔴 <span style="color: var(--control-sel-text); font-style: italic; font-weight: bold;">False Negative:</span> Disconnected from <span style="font-weight: bold;">${((1 - d.recall)*100).toFixed(1)}%</span> of points in its own class.` 
-        : `🟢 <span style="color: var(--control-sel-text); font-style: italic; font-weight: bold;">Low FNs:</span> Highly cohesive.`;
-
-    let anomalyText = d.is_anomaly ? `<span style='color: var(--anomaly-color);'>⚠️ <strong>Anomaly:</strong> True P${d.label} assigned to KMeans C${d.kmeans_cluster}</span><br>` : "";
-
+    // Renders only the core identifier and metrics in the tooltip body
     tooltip.html(`
         <strong style="color: var(--control-sel-text);">ID:</strong> ${d.id} | <strong style="color: var(--control-sel-text);">Class:</strong> ${d.label}<br>
         <strong style="color: var(--control-sel-text);">Precision:</strong> ${d.precision === 1 ? "100" : (d.precision*100).toFixed(1)}%<br>
         <strong style="color: var(--control-sel-text);">Recall:</strong> ${d.recall === 1 ? "100" : (d.recall*100).toFixed(1)}%<br>
         <strong style="color: var(--control-sel-text);">F-Score:</strong> ${d.f_score === 1 ? "100" : (d.f_score*100).toFixed(1)}%
-        <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 8px 0 6px 0;">
-        <div style="color: var(--text-main); line-height: 1.4;">
-            ${anomalyText}
-            ${fpText}<br>
-            ${fnText}
-        </div>
     `);
 
     const tooltipNode = tooltip.node();
@@ -148,24 +102,27 @@ function showTooltip(event, d) {
     const tooltipHeight = tooltipNode.offsetHeight;
     const margin = 20;
 
+    // Screen boundary logic to keep the tooltip within the viewport
     let x = event.pageX + margin;
     if (x + tooltipWidth > window.innerWidth) x = event.pageX - tooltipWidth - margin;
 
     let y = event.pageY + margin;
     if (y + tooltipHeight > window.innerHeight) y = event.pageY - tooltipHeight - margin;
 
-    tooltip.style("left", x + "px").style("top", y + "px").transition().duration(100).style("opacity", 1);
+    tooltip.style("left", x + "px")
+           .style("top", y + "px")
+           .transition().duration(100).style("opacity", 1);
 }
 
-// Function to hide the standard tooltip smoothly
+// Hides the tooltip smoothly
 function hideTooltip() {
     d3.select("#tooltip").transition().duration(200).style("opacity", 0);
 }
 
-// Function to display an extended tooltip containing radar chart attributes
+// Displays a detailed attribute tooltip or defaults to standard metrics if attributes are missing
 function showAttributeTooltip(event, d) {
     const tooltip = d3.select("#tooltip");
-    if (!d.attributes) return showTooltip(event, d); 
+    if (!d.attributes) return showTooltip(event, d);
 
     const formatKey = (key) => key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
 
@@ -187,7 +144,7 @@ function showAttributeTooltip(event, d) {
     tooltip.style("left", x + "px").style("top", y + "px").transition().duration(100).style("opacity", 1);
 }
 
-// Function to adjust the width of the dataset selector dropdown dynamically
+// Adjusts the width of the dataset selector to fit the currently selected text
 function updateDatasetSelectWidth() {
     const select = document.getElementById("dataset-selector");
     if (!select) return;
@@ -202,7 +159,7 @@ function updateDatasetSelectWidth() {
     document.body.removeChild(temp);
 }
 
-// Function to reset all hover states across visualizations
+// Resets visual highlight and opacity across all plots
 function resetAllHovers() {
     const showAnon = d3.select("#show-anomalies").property("checked");
 
@@ -221,13 +178,12 @@ function resetAllHovers() {
                 return 0.1;
             });
 
-        // PC Line explicitly highlights ONLY the selected point, completely ignoring activeIds (neighbors)
         d3.selectAll(".pc-line")
             .style("stroke-width", p => p.id === selectedPoint.id ? 3 : 1.5)
             .style("stroke", d => getLineColor(d))
             .style("opacity", p => {
                 if (p.id === selectedPoint.id) return 1;
-                return 0.05; // Only selected point is visible
+                return 0.05;
             });
 
     } else if (brushedPointsGlobal && brushedPointsGlobal.length > 0) {

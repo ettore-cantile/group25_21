@@ -1,6 +1,5 @@
 // --- MAIN LOGIC & EVENT CONTROLLERS ---
-
-// Function containing the initial Core Bootstrapper logic mapped against JSON payloads
+// Initial Core Bootstrapper logic mapped against JSON payloads
 function initDashboard(folder) {
     const targetPlotsToClear = [
         "#pca-plot", "#mds-plot", "#kmeans-plot", 
@@ -39,6 +38,7 @@ function initDashboard(folder) {
 
     const basePath = `../json/${folder}/`;
 
+    // Fetch required datasets, catching the fp_results since it might be optional
     Promise.all([
         d3.json(`${basePath}step2_final_data.json?v=${Date.now()}`),
         d3.csv(`../../dataset/${folder}.csv`),
@@ -68,6 +68,7 @@ function initDashboard(folder) {
             return String(str).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
         };
 
+        // Combine all loaded data into the primary dataset array
         data.points.forEach((p, i) => {
             if (csvData[i]) p.attributes = csvData[i];
 
@@ -133,6 +134,7 @@ function initDashboard(folder) {
             radarDimensions.forEach(dim => mdsKmeansAvg[c][dim] = d3.mean(pts, d => +d.attributes[dim]));
         });
 
+        // Set global metrics texts
         if(metadata) {
             if (metadata.global_assessment && metadata.global_assessment.pca && metadata.global_assessment.mds) {
                 d3.select("#fb-pca-trust").text((metadata.global_assessment.pca.trustworthiness * 100).toFixed(1) + "%");
@@ -193,7 +195,46 @@ function initDashboard(folder) {
     });
 }
 
-// Function handling the Global Document listeners mapped on load
+// Function to dynamically call the Public Python microservice to compute False Positives
+async function recomputeFP() {
+    // Solo l'URL pubblico, niente opzioni locali
+    const baseUrl = 'https://matteotwentywings.pythonanywhere.com';
+    
+    const k = parseInt(d3.select(".sync-k").node().value) || 15;
+    const threshold = parseFloat(d3.select(".sync-thresh").node().value) || 0.8;
+
+    try {
+        const response = await fetch(`${baseUrl}/api/compute_fp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                dataset: currentDatasetName,
+                k: k,
+                threshold: threshold
+            })
+        });
+        
+        if (!response.ok) throw new Error("API request failed");
+        const data = await response.json();
+        
+        const fpPcaSet = new Set(data.false_positive_points_pca || []);
+        const fpMdsSet = new Set(data.false_positive_points_mds || []);
+        
+        // Update the dataset with the newly computed values
+        dataset.forEach(d => {
+            d.is_fp_pca = fpPcaSet.has(d.id);
+            d.is_fp_mds = fpMdsSet.has(d.id);
+        });
+        
+        // Reapply visual filters based on new FP status
+        applyFilters();
+        
+    } catch (err) {
+        console.warn("API Error:", err);
+    }
+}
+
+// Global Document listeners
 document.addEventListener("DOMContentLoaded", () => {
     updateDatasetSelectWidth();
     initDashboard(currentDatasetName);
@@ -202,10 +243,31 @@ document.addEventListener("DOMContentLoaded", () => {
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
 
+    // Event listener to sync K input across plots and trigger API recompute
+    d3.selectAll(".sync-k").on("change", function() {
+        d3.selectAll(".sync-k").property("value", this.value);
+        recomputeFP();
+    });
+    
+    // Event listener to sync Threshold input across plots and trigger API recompute
+    d3.selectAll(".sync-thresh").on("change", function() {
+        d3.selectAll(".sync-thresh").property("value", this.value);
+        recomputeFP();
+    });
+
+    // Trigger API recompute when dataset changes
+    d3.select("#dataset-selector").on("change", function() {
+        updateDatasetSelectWidth();
+        currentDatasetName = this.value;
+        initDashboard(currentDatasetName);
+        recomputeFP();
+    });
+
     // --- REAL-TIME ID SEARCH FUNCTION ---
     d3.select("#search-point-id").on("input", function() {
         const searchId = this.value.trim();
         
+        // Helper to reset and clear selection when input is empty or invalid
         const clearSearchSelection = () => {
             selectedPoint = null;
             brushedPointsGlobal = [];
@@ -243,8 +305,16 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    d3.select("#hide-fp-pca").on("change", applyFilters);
-    d3.select("#hide-fp-mds").on("change", applyFilters);
+    // --- FP CHECKBOXES (TRIGGER SLIDE-DOWN AND FILTER) ---
+    d3.select("#hide-fp-pca").on("change", function() {
+        d3.select("#fp-params-pca").classed("expanded", this.checked);
+        applyFilters();
+    });
+
+    d3.select("#hide-fp-mds").on("change", function() {
+        d3.select("#fp-params-mds").classed("expanded", this.checked);
+        applyFilters();
+    });
     
     const themeToggle = document.getElementById('theme-toggle');
     if (themeToggle) {
@@ -271,7 +341,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-// Function that clears and redraws everything seamlessly on window resize
+// Clears and redraws everything on resize
 function refreshAllVisualizations() {
     if (!dataset || dataset.length === 0) return;
 
@@ -348,11 +418,6 @@ function refreshAllVisualizations() {
 }
 
 // --- GLOBAL EVENT LISTENERS ---
-d3.select("#dataset-selector").on("change", function() {
-    updateDatasetSelectWidth();
-    currentDatasetName = this.value;
-    initDashboard(currentDatasetName);
-});
 
 d3.select("#point-size-slider").on("input change", function() {
     currentPointSize = +this.value;
@@ -387,6 +452,7 @@ d3.selectAll("input[name='kmeansSource']").on("change", function() {
     redrawKMeansPlot();
 });
 
+// Event listener for the Sankey Mode Segemented Control
 d3.selectAll("input[name='sankeyMode']").on("change", function() {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     if (currentTab === '2d') {
@@ -427,7 +493,6 @@ d3.selectAll("input[name='mainTab']").on("change", function() {
 
 // --- FILTER & INTERACTION LOGIC ---
 
-// Function to redraw the KMeans plot specifically when the projection source changes
 function redrawKMeansPlot() {
     const xKey = kmeansProjectionSource === 'pca' ? 'pca_x' : 'mds_x';
     const yKey = kmeansProjectionSource === 'pca' ? 'pca_y' : 'mds_y';
@@ -459,8 +524,6 @@ function redrawKMeansPlot() {
 }
 
 // --- FILTERS & ANOMALIES ---
-
-// Function to apply precision/recall and FP filters to update visual visibility of points
 function applyFilters() {
     const hideFpPca = d3.select("#hide-fp-pca").property("checked");
     const hideFpMds = d3.select("#hide-fp-mds").property("checked");
@@ -473,7 +536,6 @@ function applyFilters() {
     // Update PCA Label dynamically
     const labelPca = d3.select("label[for='hide-fp-pca']");
     if (!labelPca.empty()) {
-        // Strip any existing count like "(12)" from the base text
         const baseText = labelPca.text().replace(/\s*\(\d+\)$/, "");
         labelPca.text(hideFpPca ? `${baseText} (${countFpPca})` : baseText);
     }
@@ -481,12 +543,10 @@ function applyFilters() {
     // Update MDS Label dynamically
     const labelMds = d3.select("label[for='hide-fp-mds']");
     if (!labelMds.empty()) {
-        // Strip any existing count like "(12)" from the base text
         const baseText = labelMds.text().replace(/\s*\(\d+\)$/, "");
         labelMds.text(hideFpMds ? `${baseText} (${countFpMds})` : baseText);
     }
 
-    // Apply visual filtering
     d3.selectAll(".dot, .pc-line").each(function(d) {
         const self = d3.select(this);
         let isFilteredOut = (d.precision < minPrecision || d.recall < minRecall);
@@ -515,7 +575,6 @@ function applyFilters() {
     }
 }
 
-// Function to toggle the display of discrepancy lines linking points to cluster centroids
 function toggleDiscrepancies(show) {
     const plotMapping = { kmeans: '#kmeans-plot', pca2d: '#pca-plot-2d', mds2d: '#mds-plot-2d' };
     const allPlots = ['#pca-plot', '#mds-plot', '#kmeans-plot', '#pca-plot-2d', '#mds-plot-2d'];
@@ -538,11 +597,10 @@ function toggleDiscrepancies(show) {
             const centroids = {};
             validKMeansClusters.forEach(k => centroids[k] = {x:0, y:0, count:0});
 
-            // Calculate centroids purely in raw logical data space to support semantic panning/zooming mathematically
             dataset.forEach(d => {
                 if(d.precision >= minPrecision && d.recall >= minRecall && d[clusterProp] !== undefined) {
-                    centroids[d[clusterProp]].x += d[scales.xKey];
-                    centroids[d[clusterProp]].y += d[scales.yKey];
+                    centroids[d[clusterProp]].x += scales.xScale(d[scales.xKey]);
+                    centroids[d[clusterProp]].y += scales.yScale(d[scales.yKey]);
                     centroids[d[clusterProp]].count += 1;
                 }
             });
@@ -558,24 +616,20 @@ function toggleDiscrepancies(show) {
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
                 
-                // Use dynamically tracked current scales instead of static bounds
                 svgContainer.append("line")
-                    .attr("x1", scales.currentXScale(d[scales.xKey])).attr("y1", scales.currentYScale(d[scales.yKey]))
-                    .attr("x2", scales.currentXScale(centroids[d[clusterProp]].x)).attr("y2", scales.currentYScale(centroids[d[clusterProp]].y))
-                    .attr("class", (d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct") + ` pt-${d.id}`)
-                    .datum({ d: d, c: centroids[d[clusterProp]] }); // Bind datum locally to keep zooms 60fps
+                    .attr("x1", scales.xScale(d[scales.xKey])).attr("y1", scales.yScale(d[scales.yKey]))
+                    .attr("x2", centroids[d[clusterProp]].x).attr("y2", centroids[d[clusterProp]].y)
+                    .attr("class", (d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct") + ` pt-${d.id}`);
             });
 
             validKMeansClusters.forEach(k => {
                 if(centroids[k].count === 0) return;
                 svgContainer.append("path")
-                    .attr("class", "centroid-cross")
                     .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
-                    .attr("transform", `translate(${scales.currentXScale(centroids[k].x)}, ${scales.currentYScale(centroids[k].y)})`)
+                    .attr("transform", `translate(${centroids[k].x}, ${centroids[k].y})`)
                     .style("fill", colorOriginal(k)) 
                     .style("stroke", "var(--sankey-node-stroke)") 
-                    .style("stroke-width", 1.5)
-                    .datum(centroids[k]); // Bind logical coordinates for robust zooming targeting
+                    .style("stroke-width", 1.5);
             });
         });
 
@@ -648,8 +702,6 @@ function toggleDiscrepancies(show) {
 }
 
 // --- SYNC & INTERACTION ---
-
-// Function to update the entire dashboard state when a single point is selected
 function updateSelection(d, skipNeighborGraph = false) {
     selectedPoint = d;
     brushedPointsGlobal = []; 
@@ -730,7 +782,6 @@ function updateSelection(d, skipNeighborGraph = false) {
     }
 }
 
-// Function to initialize brushing behavior across all scatter plots
 function setupBrushing() {
     const brushList = [
         { obj: brushPCA, sel: "#pca-plot", id: "pca" },
@@ -752,7 +803,6 @@ function setupBrushing() {
     });
 }
 
-// Function to handle brush events and properly identify selected points
 function handleBrush(event, brushObj, xKey, yKey) {
     if (!event.sourceEvent) return;
     d3.selectAll(".link-group line").remove(); 
@@ -800,7 +850,6 @@ function handleBrush(event, brushObj, xKey, yKey) {
     updateLiveAnalytics(selectedPoints);
 }
 
-// Function to update dynamic live analytics panels based on the selected set of points
 function updateLiveAnalytics(selectedPoints) {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     const isAnomalyOn = d3.select("#show-discrepancies").property("checked");
@@ -877,7 +926,6 @@ function updateLiveAnalytics(selectedPoints) {
 
 // --- UTILITIES ---
 
-// Function to programmatically enhance the color mode switcher component
 function enhanceColorModeSwitcher() {
     const options = [
         { value: 'original', label: 'Original' },
@@ -908,7 +956,6 @@ function enhanceColorModeSwitcher() {
     });
 }
 
-// Function to smoothly transition visual attributes of points/lines based on active color mode
 function updateColors() {
     const showAnon = d3.select("#show-anomalies").property("checked");
 
@@ -944,7 +991,6 @@ function updateColors() {
         });
 }
 
-// Function to update the Legend UI based on the active dataset/color settings
 function updateLegend() {
     const gradient = d3.select("#legend-gradient");
     const labelsDiv = d3.select("#legend-labels");
