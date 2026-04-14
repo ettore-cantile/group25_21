@@ -63,6 +63,7 @@ function initDashboard(folder) {
         const kmeans2dMap = new Map();
         if(kmeans2dData?.points) kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
 
+        // Start with static FPs, but we will overwrite them dynamically via API right after load
         const fpPcaSet = new Set(fpData?.false_positive_points_pca || []);
         const fpMdsSet = new Set(fpData?.false_positive_points_mds || []);
 
@@ -190,16 +191,19 @@ function initDashboard(folder) {
         
         if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
 
+        // FIX: Synchronize the FPs with the active UI parameters IMMEDIATELY after rendering.
+        // This ensures the label counts are completely accurate before the user even interacts.
+        recomputeFP();
+
     }).catch(err => {
         console.error(`Error loading dataset [${folder}]:`, err);
         alert(`Failed to load data for dataset: ${folder}.`);
     });
 }
 
-// Function to dynamically call the Public/Local Python microservice to compute False Positives
+// Function to dynamically call the Public Python microservice to compute False Positives
 async function recomputeFP() {
-    // Utilize the flag set in globals.js to switch environment seamlessly
-    const baseUrl = USE_LOCAL_API ? LOCAL_API_URL : PUBLIC_API_URL;
+    const baseUrl = 'https://matteotwentywings.pythonanywhere.com';
     
     const k = parseInt(d3.select(".sync-k").node().value) || 15;
     const threshold = parseFloat(d3.select(".sync-thresh").node().value) || 0.8;
@@ -256,7 +260,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateDatasetSelectWidth();
         currentDatasetName = this.value;
         initDashboard(currentDatasetName);
-        recomputeFP();
+        // recomputeFP() is safely called at the very end of initDashboard now.
     });
 
     d3.select("#search-point-id").on("input", function() {
@@ -593,7 +597,6 @@ function toggleDiscrepancies(show) {
             });
 
             dataset.forEach(d => {
-                // Skips general filters but allows drawing links to FP-hidden points
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
                 
@@ -874,7 +877,6 @@ function enhanceColorModeSwitcher() {
 }
 
 function updateColors() {
-    // Triggers color updates but ensures border-only rules stay intact
     resetAllHovers();
 }
 
