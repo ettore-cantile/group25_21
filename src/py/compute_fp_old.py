@@ -18,46 +18,36 @@ LABEL_INDEX = {
     "user_knowledge": -1
 }
 
-def calculate_fp_metrics(D_orig, D_proj, nn_orig, nn_proj, k_effective, threshold):
+def calculate_fp_metrics(nn_orig, X_proj, k_effective, min_mismatch_pct):
     """
-    Calculates False Positives based on the involvement of a point in "false neighborhoods".
-    The penalty is weighted by the severity of the distance error (how much closer they 
-    are in the 2D projection compared to the High-Dimensional space).
+    Given the original k-NN indices and a 2D projection, 
+    calculates the False Positive points, rates, and 2D neighbors.
     """
-    n_samples = D_proj.shape[0]
+    n_samples = X_proj.shape[0]
+
+    # Distance matrix for the projection
+    D_proj = squareform(pdist(X_proj, metric='euclidean'))
     
-    # Initialize the "guilt" score for each point
-    fp_scores = np.zeros(n_samples)
+    # k-NN indices in 2D
+    nn_proj = np.argsort(D_proj, axis=1)[:, 1:k_effective+1]
+
+    FP_rate = np.zeros(n_samples)
 
     for i in range(n_samples):
         set_orig = set(nn_orig[i])
         set_proj = set(nn_proj[i])
-        
-        # Points that are neighbors in 2D but were not in HD (False Positives for i)
-        false_neighbors = set_proj - set_orig
 
-        for j in false_neighbors:
-            # Calculate the weight: the difference between original and projected distance.
-            # If they were far in HD and are now close, the error (weight) is high.
-            weight = max(0, D_orig[i, j] - D_proj[i, j])
-            
-            # Penalize BOTH points involved in the false distance relationship
-            fp_scores[i] += weight
-            fp_scores[j] += weight 
+        # False neighbors: points in 2D neighborhood that are NOT in HD neighborhood
+        false_neighbors_of_i = set_proj - set_orig
+        FP_rate[i] = len(false_neighbors_of_i) / k_effective
 
-    # Normalize scores between 0 and 1 to maintain compatibility with the UI slider
-    max_score = np.max(fp_scores)
-    if max_score > 0:
-        fp_scores = fp_scores / max_score
-
-    # A point is considered a FP to be removed/hidden if its false neighborhood 
-    # involvement score exceeds the user-defined threshold
-    fp_points = np.where(fp_scores >= threshold)[0]
+    # Thresholding
+    fp_points = np.where(FP_rate >= min_mismatch_pct)[0]
 
     return fp_points.tolist()
 
 
-def process_dataset(dataset_name, k_neighbors, min_score_threshold):
+def process_dataset(dataset_name, k_neighbors, min_mismatch_pct):
     print(f"\n--- Processing FP for: {dataset_name.upper()} ---")
 
     dataset_path = os.path.join(BASE_DIR, '..', '..', 'dataset', f'{dataset_name}.csv')
@@ -80,7 +70,6 @@ def process_dataset(dataset_name, k_neighbors, min_score_threshold):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     
-    # Calculate original High-Dimensional distance matrix and neighbors
     D_orig = squareform(pdist(X_scaled, metric='euclidean'))
     effective_k = min(k_neighbors, n_samples - 2)
     nn_orig = np.argsort(D_orig, axis=1)[:, 1:effective_k+1]
@@ -88,23 +77,19 @@ def process_dataset(dataset_name, k_neighbors, min_score_threshold):
     # 2. PCA PROJECTION
     print("  -> Computing PCA...")
     X_pca = PCA(n_components=2).fit_transform(X_scaled)
-    D_pca = squareform(pdist(X_pca, metric='euclidean'))
-    nn_pca = np.argsort(D_pca, axis=1)[:, 1:effective_k+1]
-    pca_fp_pts = calculate_fp_metrics(D_orig, D_pca, nn_orig, nn_pca, effective_k, min_score_threshold)
+    pca_fp_pts = calculate_fp_metrics(nn_orig, X_pca, effective_k, min_mismatch_pct)
 
     # 3. MDS PROJECTION (random_state set for reproducibility)
     print("  -> Computing MDS...")
     X_mds = MDS(n_components=2, normalized_stress='auto', random_state=42).fit_transform(X_scaled)
-    D_mds = squareform(pdist(X_mds, metric='euclidean'))
-    nn_mds = np.argsort(D_mds, axis=1)[:, 1:effective_k+1]
-    mds_fp_pts = calculate_fp_metrics(D_orig, D_mds, nn_orig, nn_mds, effective_k, min_score_threshold)
+    mds_fp_pts = calculate_fp_metrics(nn_orig, X_mds, effective_k, min_mismatch_pct)
 
-    # 4. BUILD SIMPLIFIED JSON STRUCTURE (Format remains identical for frontend compatibility)
+    # 4. BUILD SIMPLIFIED JSON STRUCTURE
     output_data = {
         "metadata": {
             "dataset": f"{dataset_name}.csv",
             "k_neighbors": effective_k,
-            "min_mismatch_pct": min_score_threshold, # Kept key name for compatibility
+            "min_mismatch_pct": min_mismatch_pct,
             "total_samples": n_samples,
             "num_fp_points_pca": len(pca_fp_pts),
             "num_fp_points_mds": len(mds_fp_pts)
@@ -122,23 +107,23 @@ def process_dataset(dataset_name, k_neighbors, min_score_threshold):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Calculate the False Positives introduced by PCA and MDS using distance-weighted edge penalties.")
+    parser = argparse.ArgumentParser(description="Calculate the False Positives introduced by PCA and MDS.")
     parser.add_argument(
         "--k", 
         type=int, 
-        default=15, 
+        default=10, 
         help="Number of neighbors (k) to consider. Default: 15"
     )
     parser.add_argument(
         "--threshold", 
         type=float, 
-        default=0.5, 
-        help="Minimum normalized score threshold (0.0 to 1.0) to declare a point as a False Positive. Default: 0.5"
+        default=0.7, 
+        help="Minimum mismatch threshold (0.0 to 1.0) to declare a point as a False Positive. Example: 0.6 = 60%. Default: 0.8"
     )
     
     args = parser.parse_args()
 
-    print(f"Starting script with K={args.k} and FP Score Threshold={args.threshold}")
+    print(f"Starting script with K={args.k} and Mismatch Threshold={args.threshold * 100}%")
 
     for ds in DATASETS:
         process_dataset(ds, args.k, args.threshold)

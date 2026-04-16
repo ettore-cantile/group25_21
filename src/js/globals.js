@@ -1,7 +1,7 @@
 // --- GLOBAL STATE & CONFIGURATION ---
 
 // Environment Configuration
-const USE_LOCAL_API = false; // Set to true to switch to local backend
+const USE_LOCAL_API = true; // Set to true to switch to local backend
 const PUBLIC_API_URL = 'https://matteotwentywings.pythonanywhere.com';
 const LOCAL_API_URL = 'http://127.0.0.1:5000';
 

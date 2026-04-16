@@ -1,19 +1,34 @@
 {
     "metadata": {
         "dataset": "iris.csv",
-        "k_neighbors": 10,
-        "min_mismatch_pct": 0.7,
+        "k_neighbors": 15,
+        "min_mismatch_pct": 0.5,
         "total_samples": 150,
-        "num_fp_points_pca": 3,
-        "num_fp_points_mds": 2
+        "num_fp_points_pca": 8,
+        "num_fp_points_mds": 12
     },
     "false_positive_points_pca": [
         76,
+        100,
+        106,
+        114,
+        121,
+        125,
         129,
         149
     ],
     "false_positive_points_mds": [
+        50,
+        52,
+        58,
+        70,
         76,
-        127
+        106,
+        114,
+        121,
+        125,
+        129,
+        138,
+        149
     ]
 }

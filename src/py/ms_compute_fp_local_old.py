@@ -22,40 +22,26 @@ LABEL_INDEX = {
 app = Flask(__name__)
 CORS(app)
 
-def calculate_fp_metrics(D_orig, D_proj, nn_orig, nn_proj, k_effective, threshold):
+def calculate_fp_metrics(nn_orig, X_proj, k_effective, min_mismatch_pct):
     """
-    Calculates False Positives based on the involvement of a point in "false neighborhoods".
-    The penalty is weighted by the severity of the distance error (how much closer they 
-    are in the 2D projection compared to the High-Dimensional space).
+    Given the original k-NN indices and a 2D projection, 
+    calculates and returns the list of False Positive points.
     """
-    n_samples = D_proj.shape[0]
-    
-    # Initialize the "guilt" score for each point
-    fp_scores = np.zeros(n_samples)
+    n_samples = X_proj.shape[0]
+
+    D_proj = squareform(pdist(X_proj, metric='euclidean'))
+    nn_proj = np.argsort(D_proj, axis=1)[:, 1:k_effective+1]
+
+    FP_rate = np.zeros(n_samples)
 
     for i in range(n_samples):
         set_orig = set(nn_orig[i])
         set_proj = set(nn_proj[i])
-        
-        # Points that are neighbors in 2D but were not in HD (False Positives for i)
-        false_neighbors = set_proj - set_orig
 
-        for j in false_neighbors:
-            # Calculate the weight: the difference between original and projected distance.
-            weight = max(0, D_orig[i, j] - D_proj[i, j])
-            
-            # Penalize BOTH points involved in the false distance relationship
-            fp_scores[i] += weight
-            fp_scores[j] += weight 
+        false_neighbors_of_i = set_proj - set_orig
+        FP_rate[i] = len(false_neighbors_of_i) / k_effective
 
-    # Normalize scores between 0 and 1
-    max_score = np.max(fp_scores)
-    if max_score > 0:
-        fp_scores = fp_scores / max_score
-
-    # Filter points exceeding the threshold
-    fp_points = np.where(fp_scores >= threshold)[0]
-
+    fp_points = np.where(FP_rate >= min_mismatch_pct)[0]
     return fp_points.tolist()
 
 
@@ -69,7 +55,7 @@ def compute_fp():
 
     dataset_name = data['dataset']
     k_neighbors = data.get('k', 15)  # Default to 15 if not provided
-    min_score_threshold = data.get('threshold', 0.5) # Default to 0.5 for normalized scores
+    min_mismatch_pct = data.get('threshold', 0.8) # Default to 0.8 if not provided
 
     dataset_path = os.path.join(DATASET_DIR, f'{dataset_name}.csv')
 
@@ -87,30 +73,23 @@ def compute_fp():
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
-        # High-Dimensional distances and neighbors
         D_orig = squareform(pdist(X_scaled, metric='euclidean'))
         effective_k = min(k_neighbors, n_samples - 2)
         nn_orig = np.argsort(D_orig, axis=1)[:, 1:effective_k+1]
 
-        # 4. Projections and Distance-Weighted FP Calculation
-        # PCA
+        # 4. Projections and FP Calculation
         X_pca = PCA(n_components=2).fit_transform(X_scaled)
-        D_pca = squareform(pdist(X_pca, metric='euclidean'))
-        nn_pca = np.argsort(D_pca, axis=1)[:, 1:effective_k+1]
-        pca_fp_pts = calculate_fp_metrics(D_orig, D_pca, nn_orig, nn_pca, effective_k, min_score_threshold)
+        pca_fp_pts = calculate_fp_metrics(nn_orig, X_pca, effective_k, min_mismatch_pct)
 
-        # MDS
         X_mds = MDS(n_components=2, normalized_stress='auto', random_state=42).fit_transform(X_scaled)
-        D_mds = squareform(pdist(X_mds, metric='euclidean'))
-        nn_mds = np.argsort(D_mds, axis=1)[:, 1:effective_k+1]
-        mds_fp_pts = calculate_fp_metrics(D_orig, D_mds, nn_orig, nn_mds, effective_k, min_score_threshold)
+        mds_fp_pts = calculate_fp_metrics(nn_orig, X_mds, effective_k, min_mismatch_pct)
 
         # 5. Building the response
         response_data = {
             "metadata": {
                 "dataset": f"{dataset_name}.csv",
                 "k_neighbors": effective_k,
-                "min_mismatch_pct": min_score_threshold,
+                "min_mismatch_pct": min_mismatch_pct,
                 "total_samples": n_samples,
                 "num_fp_points_pca": len(pca_fp_pts),
                 "num_fp_points_mds": len(mds_fp_pts)
@@ -123,7 +102,6 @@ def compute_fp():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 if __name__ == "__main__":
     # Start the Flask development server on port 5000
