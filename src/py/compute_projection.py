@@ -19,23 +19,23 @@ LABEL_INDEX = {
 
 def calculate_normalized_stress(X_high, X_low):
     """
-    Calcola lo stress normalizzato usando il fattore di scala alpha, 
-    rispettando la condizione i < j (solo triangolo superiore della matrice).
+    Calculates the normalized stress using the scale factor alpha,
+    respecting the condition i < j (only the upper triangle of the matrix).
     """
-    # Calcola le matrici di distanza complete
+    # Calculate the full distance matrices
     d_high_matrix = pairwise_distances(X_high, metric='euclidean')
     d_low_matrix = pairwise_distances(X_low, metric='euclidean')
     
-    # Estrae solo il triangolo superiore (escludendo la diagonale con k=1) per avere i < j
+    # Extract only the upper triangle (excluding the diagonal with k=1) to ensure i < j
     idx = np.triu_indices_from(d_high_matrix, k=1)
     d_high = d_high_matrix[idx]
     d_low = d_low_matrix[idx]
     
-    # Calcolo di alpha: sum(d_ij * delta_ij) / sum(delta_ij^2)
-    # Aggiungiamo un piccolo epsilon al denominatore per evitare divisioni per zero
+    # Calculate alpha: sum(d_ij * delta_ij) / sum(delta_ij^2)
+    # Adding a small epsilon to the denominator to prevent division by zero
     alpha = np.sum(d_high * d_low) / (np.sum(d_low ** 2) + 1e-10)
     
-    # Calcolo dello stress
+    # Calculate stress
     stress = np.sqrt(np.sum((d_high - alpha * d_low) ** 2) / np.sum(d_high ** 2))
     
     return float(stress)
@@ -77,7 +77,7 @@ def run_projections_for_dataset(dataset_name):
     pca_cont = trustworthiness(pca_coords, X_scaled, n_neighbors=k_val)
     mds_cont = trustworthiness(mds_coords, X_scaled, n_neighbors=k_val)
     
-    # Calculate Stress (Aggiunta)
+    # Calculate Stress (Added)
     pca_stress = calculate_normalized_stress(X_scaled, pca_coords)
     mds_stress = calculate_normalized_stress(X_scaled, mds_coords)
 
