@@ -94,7 +94,7 @@
 
                 <div class="divider"></div>
 
-                <div style="display: flex; flex-direction: column; gap: 6px; margin-right: 15px; justify-content: center;">
+                <div style="display: flex; flex-direction: column; gap: 6px; justify-content: center;">
                     <div style="display: flex; align-items: center; gap: 6px;">
                         <input type="checkbox" id="show-anomalies" name="show-anomalies" style="margin: 0;">
                         <label for="show-anomalies" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color); margin: 0;">Show Anomalies</label>
@@ -103,6 +103,13 @@
                         <input type="checkbox" id="show-discrepancies" name="show-discrepancies" style="margin: 0;">
                         <label for="show-discrepancies" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color); margin: 0;">Show Centroids</label>
                     </div>
+                </div>
+
+                <div class="divider"></div>
+                
+                <div style="display: flex; align-items: center; gap: 6px; padding-right: 10px;">
+                    <input type="checkbox" id="hide-fp-global" name="hide-fp-global" style="margin: 0; cursor: pointer;">
+                    <label for="hide-fp-global" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--anomaly-color); margin: 0; white-space: nowrap;">Hide FP</label>
                 </div>
 
                 <div class="tab-nd" style="display: flex; align-items: center; gap: 8px;">
@@ -129,32 +136,12 @@
         <div id="plots-grid" class="tab-content tab-nd">
             
             <div class="plot-container">
-                <div class="plot-title" style="position: relative;">
-                    <span>PCA Projection</span>
-                    <div style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; font-size: 0.65rem; font-weight: normal;">
-                        <input type="checkbox" id="hide-fp-pca" style="margin: 0; cursor: pointer;">
-                        <label for="hide-fp-pca" style="cursor: pointer; color: var(--text-muted); margin: 0; white-space: nowrap;">Hide FP</label>
-                    </div>
-                </div>
-                <div id="fp-params-pca" class="fp-controls-panel">
-                    <label style="display:flex; align-items:center; gap:3px;">K: <input type="number" class="sync-k input-style" value="15" min="1" max="100" style="width: 40px; padding: 2px; text-align: center;"></label>
-                    <label style="display:flex; align-items:center; gap:3px;">Rate Mismatch ≥ <input type="number" class="sync-thresh input-style" value="0.8" step="0.1" min="0" max="1" style="width: 45px; padding: 2px; text-align: center;"></label>
-                </div>
+                <div class="plot-title">PCA Projection</div>
                 <div id="pca-plot" class="svg-container"></div>
             </div>
 
             <div class="plot-container">
-                <div class="plot-title" style="position: relative;">
-                    <span>MDS Projection</span>
-                    <div style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; font-size: 0.65rem; font-weight: normal;">
-                        <input type="checkbox" id="hide-fp-mds" style="margin: 0; cursor: pointer;">
-                        <label for="hide-fp-mds" style="cursor: pointer; color: var(--text-muted); margin: 0; white-space: nowrap;">Hide FP</label>
-                    </div>
-                </div>
-                <div id="fp-params-mds" class="fp-controls-panel">
-                    <label style="display:flex; align-items:center; gap:3px;">K: <input type="number" class="sync-k input-style" value="15" min="1" max="100" style="width: 40px; padding: 2px; text-align: center;"></label>
-                    <label style="display:flex; align-items:center; gap:3px;">Rate Mismatch ≥ <input type="number" class="sync-thresh input-style" value="0.8" step="0.1" min="0" max="1" style="width: 45px; padding: 2px; text-align: center;"></label>
-                </div>
+                <div class="plot-title">MDS Projection</div>
                 <div id="mds-plot" class="svg-container"></div>
             </div>
 
@@ -166,6 +153,65 @@
 
         <div class="plot-container tab-content tab-nd" id="pc-panel">
             <div id="pc-plot" class="svg-container"></div>
+            <div id="fp-config-panel" class="hidden-panel">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <svg viewBox="0 0 24 24" width="24" height="24" stroke="var(--control-sel-text)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <h3 style="margin: 0; font-size: 1.1rem; color: var(--text-title);">False Positives Configuration</h3>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 20px; margin-top: 5px;">
+                    <div style="display: flex; flex-direction: column; gap: 5px;">
+                        <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">Calculation Method</label>
+                        <select id="fp-method-select" class="input-style" style="padding: 6px 10px; font-size: 0.9rem; min-width: 200px; cursor: pointer;">
+                            <option value="weighted" selected>Weighted Distance</option>
+                            <option value="mismatch">K-Neighborhood Mismatch</option>
+                            <option value="stress">Stress Function (Alpha)</option>
+                            <option value="centroids">Pseudo-Centroids</option>
+                        </select>
+                    </div>
+                    
+                    <div style="width: 1px; height: 40px; background: var(--border-color); margin: 0 10px;"></div>
+        
+                    <div id="fp-params-weighted" class="fp-params-group">
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">K Neighbors</label>
+                            <input type="number" id="fp-k-weighted" class="fp-param-input input-style" value="15" min="1" max="100" style="width: 80px; padding: 6px; text-align: center;">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">Threshold</label>
+                            <input type="number" id="fp-thresh-weighted" class="fp-param-input input-style" value="0.5" step="0.1" min="0" max="1" style="width: 80px; padding: 6px; text-align: center;">
+                        </div>
+                    </div>
+                    
+                    <div id="fp-params-mismatch" class="fp-params-group hidden-panel">
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">K Neighbors</label>
+                            <input type="number" id="fp-k-mismatch" class="fp-param-input input-style" value="15" min="1" max="100" style="width: 80px; padding: 6px; text-align: center;">
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">Mismatch Rate</label>
+                            <input type="number" id="fp-thresh-mismatch" class="fp-param-input input-style" value="0.5" step="0.1" min="0" max="1" style="width: 80px; padding: 6px; text-align: center;">
+                        </div>
+                    </div>
+                    
+                    <div id="fp-params-stress" class="fp-params-group hidden-panel">
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">Error Threshold</label>
+                            <input type="number" id="fp-thresh-stress" class="fp-param-input input-style" value="0.1" step="0.05" min="0" max="1" style="width: 80px; padding: 6px; text-align: center;">
+                        </div>
+                    </div>
+                    
+                    <div id="fp-params-centroids" class="fp-params-group hidden-panel">
+                        <div style="display: flex; flex-direction: column; gap: 5px;">
+                            <label style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">Error Threshold</label>
+                            <input type="number" id="fp-thresh-centroids" class="fp-param-input input-style" value="0.1" step="0.05" min="0" max="1" style="width: 80px; padding: 6px; text-align: center;">
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div id="plots-grid-2d" class="tab-content tab-2d hidden-panel">

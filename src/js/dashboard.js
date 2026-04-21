@@ -63,7 +63,6 @@ function initDashboard(folder) {
         const kmeans2dMap = new Map();
         if(kmeans2dData?.points) kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
 
-        // Start with static FPs, but we will overwrite them dynamically via API right after load
         const fpPcaSet = new Set(fpData?.false_positive_points_pca || []);
         const fpMdsSet = new Set(fpData?.false_positive_points_mds || []);
 
@@ -144,7 +143,6 @@ function initDashboard(folder) {
                 d3.select("#fb-mds-trust").text((metadata.global_assessment.mds.trustworthiness * 100).toFixed(1) + "%");
                 d3.select("#fb-mds-cont").text((metadata.global_assessment.mds.continuity * 100).toFixed(1) + "%");
                 
-                // ADDED: Extract and display Stress values
                 let pcaStress = metadata.global_assessment.pca.stress;
                 let mdsStress = metadata.global_assessment.mds.stress;
                 d3.select("#fb-pca-stress").text(pcaStress !== undefined ? (pcaStress * 100).toFixed(1) + "%" : "N/A");
@@ -197,7 +195,6 @@ function initDashboard(folder) {
         
         if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
 
-        // FIX: Synchronize the FPs with the active UI parameters IMMEDIATELY after rendering.
         recomputeFP();
 
     }).catch(err => {
@@ -209,21 +206,32 @@ function initDashboard(folder) {
 // Function to dynamically call the Public/Local Python microservice to compute False Positives
 async function recomputeFP() {
     const baseUrl = USE_LOCAL_API ? LOCAL_API_URL : PUBLIC_API_URL;
-    
-    const k = parseInt(d3.select(".sync-k").node().value) || 15;
-    const threshold = parseFloat(d3.select(".sync-thresh").node().value) || 0.8;
+    let endpoint = '';
+    let payload = { dataset: currentDatasetName };
+
+    if (fpMethod === 'weighted') {
+        endpoint = '/api/compute_fp_weighted';
+        payload.k = parseInt(d3.select("#fp-k-weighted").node().value) || 15;
+        payload.threshold = parseFloat(d3.select("#fp-thresh-weighted").node().value) || 0.5;
+    } else if (fpMethod === 'mismatch') {
+        endpoint = '/api/compute_fp_mismatch';
+        payload.k = parseInt(d3.select("#fp-k-mismatch").node().value) || 15;
+        payload.threshold = parseFloat(d3.select("#fp-thresh-mismatch").node().value) || 0.5;
+    } else if (fpMethod === 'stress') {
+        endpoint = '/api/compute_fp_stress';
+        payload.threshold = parseFloat(d3.select("#fp-thresh-stress").node().value) || 0.1;
+    } else if (fpMethod === 'centroids') {
+        endpoint = '/api/compute_fp_centroids';
+        payload.threshold = parseFloat(d3.select("#fp-thresh-centroids").node().value) || 0.1;
+    }
 
     d3.select("#global-loader").classed("hidden-panel", false);
 
     try {
-        const response = await fetch(`${baseUrl}/api/compute_fp_weighted`, {
+        const response = await fetch(`${baseUrl}${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                dataset: currentDatasetName,
-                k: k,
-                threshold: threshold
-            })
+            body: JSON.stringify(payload)
         });
         
         if (!response.ok) throw new Error("API request failed");
@@ -255,15 +263,35 @@ document.addEventListener("DOMContentLoaded", () => {
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
 
-    d3.selectAll(".sync-k").on("change", function() {
-        d3.selectAll(".sync-k").property("value", this.value);
+    d3.select("#hide-fp-global").on("change", function() {
+        const isChecked = this.checked;
+        if (isChecked) {
+            d3.select("#pc-plot").classed("hidden-panel", true);
+            d3.select("#fp-config-panel").classed("hidden-panel", false);
+            d3.select("#app-grid").classed("show-fp-config", true);
+            d3.select("#pc-panel").classed("hidden-panel", false);
+            recomputeFP();
+        } else {
+            d3.select("#pc-plot").classed("hidden-panel", false);
+            d3.select("#fp-config-panel").classed("hidden-panel", true);
+            d3.select("#app-grid").classed("show-fp-config", false);
+            
+            const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+            if (currentTab === '2d') {
+                d3.select("#pc-panel").classed("hidden-panel", true);
+            }
+            applyFilters();
+        }
+    });
+
+    d3.select("#fp-method-select").on("change", function() {
+        fpMethod = this.value;
+        d3.selectAll(".fp-params-group").classed("hidden-panel", true);
+        d3.select(`#fp-params-${fpMethod}`).classed("hidden-panel", false);
         recomputeFP();
     });
-    
-    d3.selectAll(".sync-thresh").on("change", function() {
-        d3.selectAll(".sync-thresh").property("value", this.value);
-        recomputeFP();
-    });
+
+    d3.selectAll(".fp-param-input").on("change", recomputeFP);
 
     d3.select("#dataset-selector").on("change", function() {
         updateDatasetSelectWidth();
@@ -301,16 +329,6 @@ document.addEventListener("DOMContentLoaded", () => {
         } else {
             clearSearchSelection();
         }
-    });
-
-    d3.select("#hide-fp-pca").on("change", function() {
-        d3.select("#fp-params-pca").classed("expanded", this.checked);
-        applyFilters();
-    });
-
-    d3.select("#hide-fp-mds").on("change", function() {
-        d3.select("#fp-params-mds").classed("expanded", this.checked);
-        applyFilters();
     });
     
     const themeToggle = document.getElementById('theme-toggle');
@@ -394,6 +412,9 @@ function refreshAllVisualizations() {
         d3.select("#app-grid").classed("mode-2d", true);
         d3.selectAll(".tab-nd").classed("hidden-panel", true);
         d3.selectAll(".tab-2d").classed("hidden-panel", false);
+        if (d3.select("#hide-fp-global").property("checked")) {
+            d3.select("#pc-panel").classed("hidden-panel", false);
+        }
     }
 
     setupBrushing();
@@ -461,15 +482,30 @@ d3.selectAll("input[name='sankeyMode']").on("change", function() {
 
 d3.selectAll("input[name='mainTab']").on("change", function() {
     const selectedTab = this.value;
+    const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
     
     if (selectedTab === 'nd') {
         d3.select("#app-grid").classed("mode-2d", false);
         d3.selectAll(".tab-nd").classed("hidden-panel", false);
         d3.selectAll(".tab-2d").classed("hidden-panel", true);
+        
+        if (hideFpGlobal) {
+            d3.select("#pc-plot").classed("hidden-panel", true);
+            d3.select("#fp-config-panel").classed("hidden-panel", false);
+        } else {
+            d3.select("#pc-plot").classed("hidden-panel", false);
+            d3.select("#fp-config-panel").classed("hidden-panel", true);
+        }
+        
     } else {
         d3.select("#app-grid").classed("mode-2d", true);
         d3.selectAll(".tab-nd").classed("hidden-panel", true);
         d3.selectAll(".tab-2d").classed("hidden-panel", false);
+        
+        if (hideFpGlobal) {
+            d3.select("#pc-panel").classed("hidden-panel", false);
+        }
+        
         const activeData = brushedPointsGlobal.length > 1 
             ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall)
             : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
@@ -517,22 +553,15 @@ function redrawKMeansPlot() {
 
 // Applies logical filters and sets CSS classes. Defers visual rendering to resetAllHovers.
 function applyFilters() {
-    const hideFpPca = d3.select("#hide-fp-pca").property("checked");
-    const hideFpMds = d3.select("#hide-fp-mds").property("checked");
+    const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
 
     const countFpPca = dataset.filter(d => d.is_fp_pca && d.precision >= minPrecision && d.recall >= minRecall).length;
     const countFpMds = dataset.filter(d => d.is_fp_mds && d.precision >= minPrecision && d.recall >= minRecall).length;
 
-    const labelPca = d3.select("label[for='hide-fp-pca']");
-    if (!labelPca.empty()) {
-        const baseText = labelPca.text().replace(/\s*\(\d+\)$/, "");
-        labelPca.text(hideFpPca ? `${baseText} (${countFpPca})` : baseText);
-    }
-
-    const labelMds = d3.select("label[for='hide-fp-mds']");
-    if (!labelMds.empty()) {
-        const baseText = labelMds.text().replace(/\s*\(\d+\)$/, "");
-        labelMds.text(hideFpMds ? `${baseText} (${countFpMds})` : baseText);
+    const labelGlobal = d3.select("label[for='hide-fp-global']");
+    if (!labelGlobal.empty()) {
+        const baseText = labelGlobal.text().replace(/\s*\(\d+\/\d+\)$/, "");
+        labelGlobal.text(hideFpGlobal ? `${baseText} (${countFpPca}/${countFpMds})` : baseText);
     }
 
     d3.selectAll(".dot, .pc-line").each(function(d) {
@@ -540,9 +569,11 @@ function applyFilters() {
         let isGeneralFiltered = (d.precision < minPrecision || d.recall < minRecall);
         
         let isFpFiltered = false;
-        if (self.classed("dot-pca") && hideFpPca && d.is_fp_pca) isFpFiltered = true;
-        if (self.classed("dot-mds") && hideFpMds && d.is_fp_mds) isFpFiltered = true;
-        if (self.classed("pc-line") && ((hideFpPca && d.is_fp_pca) || (hideFpMds && d.is_fp_mds))) isFpFiltered = true;
+        if (self.classed("dot-pca") && hideFpGlobal && d.is_fp_pca) isFpFiltered = true;
+        if (self.classed("dot-mds") && hideFpGlobal && d.is_fp_mds) isFpFiltered = true;
+        if (self.classed("dot-pca2d") && hideFpGlobal && d.is_fp_pca) isFpFiltered = true;
+        if (self.classed("dot-mds2d") && hideFpGlobal && d.is_fp_mds) isFpFiltered = true;
+        if (self.classed("pc-line") && hideFpGlobal && (d.is_fp_pca || d.is_fp_mds)) isFpFiltered = true;
 
         self.classed("filtered-fp", isFpFiltered);
 
