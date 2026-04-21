@@ -17,9 +17,10 @@ let brushedPointsGlobal = [];
 let kmeansProjectionSource = 'pca';
 let currentDatasetName = "wine";
 
-// Active filters
+// Active filters & parameters
 let minPrecision = 0;
 let minRecall = 0;
+let fpMethod = 'weighted'; // Selected False Positive Method globally scoped
 
 // Brush state
 let savedBrushExtent = null;
@@ -235,23 +236,17 @@ function resetAllHovers() {
         let baseColor = getColor(p);
         if (colorMode === 'original' && showAnon && isAnom) baseColor = 'var(--anomaly-color)';
 
-        // --- GHOST POINT LOGIC --- 
-        const finalFill = (isFilteredFP && isHighlighted) ? "transparent" : baseColor;
-        const finalStroke = isSelected ? "var(--hover-stroke)" : (isFilteredFP && isHighlighted ? baseColor : "var(--dot-stroke)");
-        const finalStrokeWidth = isSelected ? 2 : (isFilteredFP && isHighlighted ? 1.5 : 0.8);
-        const finalOpacity = isFilteredFP ? (isHighlighted ? targetOpacity : 0) : targetOpacity;
-
+        // Apply visual properties
         self.attr("d", getSymbolPath(plotClass, p, isSelected))
-            .style("fill", finalFill)
-            .style("stroke", finalStroke)
-            .style("stroke-width", finalStrokeWidth)
-            .style("opacity", finalOpacity)
-            .style("pointer-events", finalOpacity > 0 ? "auto" : "none"); 
+            .style("fill", baseColor)
+            .style("stroke", isSelected ? "var(--hover-stroke)" : "var(--dot-stroke)")
+            .style("stroke-width", isSelected ? 2 : 0.8)
+            .style("opacity", targetOpacity)
+            .style("pointer-events", targetOpacity > 0 ? "auto" : "none"); 
     });
 
     d3.selectAll(".pc-line").each(function(p) {
         const self = d3.select(this);
-        const isFilteredFP = self.classed("filtered-fp");
         
         let targetOpacity = 0.6;
         let sw = (showAnon && p.is_anomaly && colorMode === 'original') ? 2.5 : 1.5;
@@ -267,12 +262,10 @@ function resetAllHovers() {
             targetOpacity = (showAnon && p.is_anomaly && colorMode === 'original') ? 0.9 : 0.6;
         }
 
-        const finalOpacity = isFilteredFP ? (isHighlighted ? targetOpacity : 0) : targetOpacity;
-
         self.style("stroke", getLineColor(p))
             .style("stroke-width", sw)
-            .style("opacity", finalOpacity)
-            .style("pointer-events", finalOpacity > 0 ? "visibleStroke" : "none"); 
+            .style("opacity", targetOpacity)
+            .style("pointer-events", targetOpacity > 0 ? "visibleStroke" : "none"); 
     });
 
     hideTooltip();
