@@ -38,7 +38,7 @@ function initDashboard(folder) {
     d3.select("#confusion-matrix-container").classed("hidden-panel", true);
     d3.select("#radar-chart-container").classed("hidden-panel", true);
     d3.select("#neighbor-graph-container").classed("hidden-panel", true);
-    d3.select("#dynamic-panel-title").text("Live Analytics");
+    d3.select("#dynamic-panel-title").text("Analytics");
 
     const basePath = `../json/${folder}/`;
 
@@ -221,6 +221,11 @@ async function recomputeFP() {
     } else if (fpMethod === 'stress') {
         endpoint = '/api/compute_fp_stress';
         payload.threshold = parseFloat(d3.select("#fp-thresh-stress").node().value) || 0.1;
+    } else if (fpMethod === 'iterative') { 
+        // Route to iterative endpoint and attach both independent targets
+        endpoint = '/api/compute_fp_iterative_stress';
+        payload.target_stress_pca = parseFloat(d3.select("#fp-target-stress-pca").node().value) || 0.1;
+        payload.target_stress_mds = parseFloat(d3.select("#fp-target-stress-mds").node().value) || 0.1;
     } else if (fpMethod === 'centroids') {
         endpoint = '/api/compute_fp_centroids';
         payload.threshold = parseFloat(d3.select("#fp-thresh-centroids").node().value) || 0.1;
@@ -368,6 +373,15 @@ document.addEventListener("DOMContentLoaded", () => {
     d3.select("#fp-thresh-stress").on("input", function() {
         d3.select("#val-fp-thresh-stress").text(parseFloat(this.value).toFixed(2));
     });
+
+    // Update value span displays dynamically for the independent iterative stress sliders
+    d3.select("#fp-target-stress-pca").on("input", function() {
+        d3.select("#val-fp-target-stress-pca").text(parseFloat(this.value).toFixed(2));
+    });
+    d3.select("#fp-target-stress-mds").on("input", function() {
+        d3.select("#val-fp-target-stress-mds").text(parseFloat(this.value).toFixed(2));
+    });
+
     d3.select("#fp-thresh-centroids").on("input", function() {
         d3.select("#val-fp-thresh-centroids").text(parseFloat(this.value).toFixed(2));
     });
@@ -789,10 +803,10 @@ function toggleDiscrepancies(show) {
         if (!selectedPoint && brushedPointsGlobal.length === 0) {
             if (currentTab === '2d') {
                 d3.select("#radar-empty-state").classed("hidden-panel", false);
-                d3.select("#dynamic-panel-title").text("Live Analytics");
+                d3.select("#dynamic-panel-title").text("Analytics");
             } else {
                 d3.select("#empty-state-placeholder").classed("hidden-panel", false);
-                d3.select("#dynamic-panel-title").text("Live Analytics");
+                d3.select("#dynamic-panel-title").text("Analytics");
             }
         }
     }
@@ -964,7 +978,7 @@ function updateLiveAnalytics(selectedPoints) {
                 d3.select("#confusion-matrix-container").classed("hidden-panel", true);
                 d3.select("#empty-state-placeholder").classed("hidden-panel", true);
                 d3.select("#radar-empty-state").classed("hidden-panel", false);
-                d3.select("#dynamic-panel-title").text("Live Analytics");
+                d3.select("#dynamic-panel-title").text("Analytics");
             }
         }
         
@@ -977,7 +991,7 @@ function updateLiveAnalytics(selectedPoints) {
     d3.select("#radar-chart-container").classed("hidden-panel", true);
 
     if (selectedPoints.length === 0) {
-        d3.select("#dynamic-panel-title").text("Live Analytics");
+        d3.select("#dynamic-panel-title").text("Analytics");
         d3.select("#gauges-container").classed("hidden-panel", true);
         d3.select("#neighbor-graph-container").classed("hidden-panel", true);
         

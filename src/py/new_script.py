@@ -143,6 +143,68 @@ def calc_fp_stress(D_orig, D_proj, threshold):
         fp_points.add(int(j_upper[idx]))
     return list(fp_points)
 
+def calc_fp_iterative_stress(D_orig, D_proj, target_stress, max_iters=5000):
+    """
+    Iteratively identifies the worst false positive pairs and removes 
+    ALL edges of the corresponding nodes, updating the global stress 
+    until it falls below the target_stress threshold.
+    """
+    i_upper, j_upper = np.triu_indices_from(D_orig, k=1)
+    valid_mask = np.ones(len(i_upper), dtype=bool)
+    fp_points = set()
+    
+    d_all = D_orig[i_upper, j_upper]
+    delta_all = D_proj[i_upper, j_upper]
+    
+    for _ in range(max_iters):
+        d = d_all[valid_mask]
+        delta = delta_all[valid_mask]
+        
+        # Guard against zero-division in remaining pairs
+        if len(d) == 0 or np.sum(d**2) == 0 or np.sum(delta**2) == 0:
+            break
+            
+        # Compute rescaling factor alpha
+        alpha = np.sum(d * delta) / np.sum(delta**2)
+        
+        # Compute standard MDS stress based on current active pairs
+        errors = (d - alpha * delta)**2
+        stress = np.sqrt(np.sum(errors) / np.sum(d**2))
+        
+        # Terminate iteration if global stress has reached the desired threshold
+        if stress <= target_stress:
+            break
+            
+        # Filter to only consider pairs where original distance is unexpectedly larger
+        # than projected distance (d > alpha * delta) as False Positives candidates.
+        fp_cond = d > alpha * delta
+        
+        if not np.any(fp_cond):
+            break
+            
+        # Assign actual errors where condition holds, -1 otherwise to ignore them
+        fp_errors = np.where(fp_cond, errors, -1)
+        max_err_idx = np.argmax(fp_errors)
+        
+        # Map the index from the masked array back to the original index
+        actual_idx = np.where(valid_mask)[0][max_err_idx]
+        
+        # Identify the points forming the worst edge
+        p1 = int(i_upper[actual_idx])
+        p2 = int(j_upper[actual_idx])
+        
+        # Add them to the false positive set
+        fp_points.add(p1)
+        fp_points.add(p2)
+        
+        # CRITICAL FIX: Align the iterative loop with the point-based evaluation.
+        # When a pair is identified as false, we consider the nodes corrupted.
+        # Therefore, we must invalidate ALL pairs connected to these nodes.
+        invalid_new = (i_upper == p1) | (i_upper == p2) | (j_upper == p1) | (j_upper == p2)
+        valid_mask[invalid_new] = False
+        
+    return list(fp_points)
+
 def calc_fp_centroids(X_hd, X_proj, labels, threshold):
     """False positives based on false distances to pseudo-centroids."""
     unique_labels = np.unique(labels)
@@ -230,6 +292,38 @@ def endpoint_fp_stress():
 
         return jsonify({
             "metadata": {"dataset": dataset_name, "method": "stress_alpha", "threshold": threshold},
+            "false_positive_points_pca": pca_fp,
+            "false_positive_points_mds": mds_fp,
+            "stress_pca": calc_filtered_stress(ctx['D_orig'], ctx['D_pca'], pca_fp),
+            "stress_mds": calc_filtered_stress(ctx['D_orig'], ctx['D_mds'], mds_fp)
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/compute_fp_iterative_stress', methods=['POST'])
+def endpoint_fp_iterative_stress():
+    """Endpoint for processing iterative stress reduction with independent targets for PCA and MDS."""
+    data = request.get_json()
+    dataset_name = data.get('dataset')
+    
+    # Extract independent target stress values from the payload
+    target_stress_pca = data.get('target_stress_pca', 0.1)
+    target_stress_mds = data.get('target_stress_mds', 0.1)
+
+    try:
+        ctx = load_and_project(dataset_name, 15) 
+        
+        # Calculate iterative stress independently for each projection using its respective target
+        pca_fp = calc_fp_iterative_stress(ctx['D_orig'], ctx['D_pca'], target_stress_pca)
+        mds_fp = calc_fp_iterative_stress(ctx['D_orig'], ctx['D_mds'], target_stress_mds)
+
+        return jsonify({
+            "metadata": {
+                "dataset": dataset_name, 
+                "method": "iterative_stress", 
+                "target_stress_pca": target_stress_pca,
+                "target_stress_mds": target_stress_mds
+            },
             "false_positive_points_pca": pca_fp,
             "false_positive_points_mds": mds_fp,
             "stress_pca": calc_filtered_stress(ctx['D_orig'], ctx['D_pca'], pca_fp),
