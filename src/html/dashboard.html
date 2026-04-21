@@ -156,24 +156,24 @@
             <div id="fp-config-panel" class="hidden-panel">
                 <div class="fp-config-header">
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="var(--control-sel-text)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <svg viewBox="0 0 24 24" width="22" height="22" stroke="var(--control-sel-text)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
-                        <h3 style="margin:0; font-size: 1rem;">False Positives Configuration</h3>
+                        <h3 style="margin:0; font-size: 1.15rem;">False Positives Configuration</h3>
                     </div>
 
-                    <div style="display: flex; align-items: center; gap: 15px;">
+                    <div style="display: flex; align-items: center; gap: 20px;">
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <input type="checkbox" id="show-fp-overlay" name="show-fp-overlay" style="margin: 0; cursor: pointer;">
-                            <label for="show-fp-overlay" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--text-main); margin: 0;">
+                            <input type="checkbox" id="show-fp-overlay" name="show-fp-overlay" style="margin: 0; cursor: pointer; transform: scale(1.1);">
+                            <label for="show-fp-overlay" style="font-size: 0.9rem; cursor: pointer; font-weight: bold; color: var(--text-main); margin: 0;">
                                 Show FP
                             </label>
                         </div>
                         
                         <div id="pseudo-centroids-toggle-container" style="display: none; align-items: center; gap: 6px;">
-                            <input type="checkbox" id="show-pseudo-centroids" name="show-pseudo-centroids" style="margin: 0; cursor: pointer;">
-                            <label for="show-pseudo-centroids" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--text-main); margin: 0;">
+                            <input type="checkbox" id="show-pseudo-centroids" name="show-pseudo-centroids" style="margin: 0; cursor: pointer; transform: scale(1.1);">
+                            <label for="show-pseudo-centroids" style="font-size: 0.9rem; cursor: pointer; font-weight: bold; color: var(--text-main); margin: 0;">
                                 Show Pseudo-Centroids
                             </label>
                         </div>
@@ -183,8 +183,8 @@
                 <div class="fp-config-wrapper">
                     <div class="fp-config-body">
                         <div class="fp-control-block">
-                            <label>Method</label>
-                            <select id="fp-method-select" class="input-style">
+                            <label>Calculation Method</label>
+                            <select id="fp-method-select" class="input-style" style="font-size: 0.95rem; padding: 6px 12px;">
                                 <option value="weighted" selected>Weighted Distance</option>
                                 <option value="mismatch">K-Neighborhood Mismatch</option>
                                 <option value="stress">Stress Function (Alpha)</option>
@@ -217,16 +217,22 @@
                         </div>
                         
                         <div id="fp-params-stress" class="fp-params-group hidden-panel">
-                            <div class="fp-control-block">
-                                <label>Error Threshold</label>
-                                <input type="number" id="fp-thresh-stress" class="fp-param-input input-style fp-num-input" value="0.1" step="0.05" min="0" max="1">
+                            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 180px; justify-content: center;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <label for="fp-thresh-stress" style="font-size: 0.85rem; font-weight: bold; color: var(--text-title); margin:0;">Threshold:</label>
+                                    <input type="range" id="fp-thresh-stress" class="fp-param-input" min="0" max="1" step="0.05" value="0.1" style="width: 90px; margin:0; padding:0; cursor: pointer;">
+                                    <span id="val-fp-thresh-stress" style="font-size: 0.85rem; font-weight: bold; width: 35px; text-align:right; color: var(--control-sel-text);">0.10</span>
+                                </div>
                             </div>
                         </div>
                         
                         <div id="fp-params-centroids" class="fp-params-group hidden-panel">
-                            <div class="fp-control-block">
-                                <label>Error Threshold</label>
-                                <input type="number" id="fp-thresh-centroids" class="fp-param-input input-style fp-num-input" value="0.1" step="0.05" min="0" max="1">
+                            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 180px; justify-content: center;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                                    <label for="fp-thresh-centroids" style="font-size: 0.85rem; font-weight: bold; color: var(--text-title); margin:0;">Threshold:</label>
+                                    <input type="range" id="fp-thresh-centroids" class="fp-param-input" min="0" max="1" step="0.05" value="0.1" style="width: 90px; margin:0; padding:0; cursor: pointer;">
+                                    <span id="val-fp-thresh-centroids" style="font-size: 0.85rem; font-weight: bold; width: 35px; text-align:right; color: var(--control-sel-text);">0.10</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -236,17 +242,20 @@
                             <thead>
                                 <tr>
                                     <th style="text-align: left;">Projection</th>
-                                    <th style="text-align: right;">False Positives</th>
+                                    <th style="text-align: center;">False Positives</th>
+                                    <th style="text-align: right;">Updated Stress</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td><strong>PCA</strong></td>
-                                    <td id="fp-count-pca" style="text-align: right; color: var(--anomaly-color); font-weight: bold;">0</td>
+                                    <td id="fp-count-pca" style="text-align: center; color: var(--anomaly-color); font-weight: bold;">0</td>
+                                    <td id="fp-stress-pca" style="text-align: right; font-weight: bold; color: var(--control-sel-text);">0.0%</td>
                                 </tr>
                                 <tr>
                                     <td><strong>MDS</strong></td>
-                                    <td id="fp-count-mds" style="text-align: right; color: var(--anomaly-color); font-weight: bold;">0</td>
+                                    <td id="fp-count-mds" style="text-align: center; color: var(--anomaly-color); font-weight: bold;">0</td>
+                                    <td id="fp-stress-mds" style="text-align: right; font-weight: bold; color: var(--control-sel-text);">0.0%</td>
                                 </tr>
                             </tbody>
                         </table>

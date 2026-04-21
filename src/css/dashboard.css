@@ -261,7 +261,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     min-height: 0; padding-top: 5px; 
 }
 
-/* --- COMPACT FALSE POSITIVES CONFIGURATION PANEL --- */
+/* --- REDESIGNED FALSE POSITIVES CONFIGURATION PANEL --- */
 #fp-config-panel {
     display: flex; 
     flex-direction: column; 
@@ -278,19 +278,19 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     display: flex;
     align-items: center;
     justify-content: center; 
-    gap: 20px;
+    gap: 30px;
     width: 100%; 
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
 
 .fp-config-wrapper {
     display: flex; 
     flex-direction: row; 
     align-items: stretch; 
-    gap: 20px; 
+    gap: 30px; 
     width: 100%; 
-    max-width: 800px;  /* Ensures panel is not exceedingly wide */
-    margin: 0 auto;    /* Centers the panel perfectly matching PC plot width logic */
+    max-width: 950px;  /* Enlarged maximum width for better breathing room */
+    margin: 0 auto;    
     justify-content: center;
 }
 
@@ -299,22 +299,22 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     align-items: center;
     justify-content: center;
     background: var(--control-bg); 
-    padding: 8px 15px;
-    border-radius: 8px;
+    padding: 15px 25px;       /* Increased padding */
+    border-radius: 12px;      /* Modern roundness */
     border: 1px solid var(--border-color);
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-    gap: 15px;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); /* Softer inner shadow */
+    gap: 20px;                /* More space between blocks */
     flex-wrap: wrap;
 }
 
 .fp-control-block {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
 }
 
 .fp-control-block label {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     color: var(--text-muted);
     font-weight: bold;
     text-transform: uppercase;
@@ -323,51 +323,52 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 
 .fp-divider {
     width: 1px; 
-    height: 35px; 
+    height: 40px; 
     background: var(--border-color); 
-    margin: 0 5px;
+    margin: 0 10px;
 }
 
 .fp-params-group {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 20px;
 }
 
 .fp-num-input {
-    width: 75px;
+    width: 80px;
     text-align: center;
-    padding: 4px 8px !important;
+    padding: 6px 10px !important;
 }
 
-/* FP Table Sub-component Styles */
+/* Enlarged FP Table Sub-component Styles */
 .fp-summary-box {
     background: var(--control-bg);
-    border-radius: 8px;
+    border-radius: 12px; 
     border: 1px solid var(--border-color);
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
-    padding: 8px 15px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Proper elevation shadow */
+    padding: 15px 25px; /* Spaced out inner content */
     display: flex;
     align-items: center;
-    min-width: 180px;
+    min-width: 360px; /* Force minimum width to not feel cramped */
 }
 
 .fp-summary-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.8rem;
+    font-size: 0.95rem; /* Larger numeric text */
 }
 
 .fp-summary-table th {
     color: var(--text-muted);
     text-transform: uppercase;
     border-bottom: 1px solid var(--border-color);
-    padding-bottom: 5px;
-    font-size: 0.65rem;
+    padding-bottom: 8px;
+    font-size: 0.75rem;
 }
 
 .fp-summary-table td {
-    padding-top: 5px;
+    padding-top: 10px;
+    padding-bottom: 5px;
     color: var(--text-main);
 }
 
@@ -377,7 +378,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     border: 1px solid var(--border-color);
     color: var(--text-title);
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 6px 10px;
     outline: none;
     font-family: inherit;
     font-size: 0.85rem;

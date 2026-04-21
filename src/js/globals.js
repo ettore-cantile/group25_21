@@ -22,6 +22,10 @@ let minPrecision = 0;
 let minRecall = 0;
 let fpMethod = 'weighted'; // Selected False Positive Method globally scoped
 
+// Server-side calculated pseudo-centroids cache
+let pseudoCentroidsPCA = null;
+let pseudoCentroidsMDS = null;
+
 // Brush state
 let savedBrushExtent = null;
 let savedBrushSource = null;
@@ -40,10 +44,6 @@ let radarMinMax = {};
 let origClusterAvg = {};
 let pcaKmeansAvg = {};
 let mdsKmeansAvg = {};
-
-// Pseudo-Centroids Storage for API Endpoint 4
-let pseudoCentroidsPCA = {};
-let pseudoCentroidsMDS = {};
 
 // Color Scales Configuration
 const customTableau = [...d3.schemeTableau10];
@@ -233,11 +233,7 @@ function resetAllHovers() {
     const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
     const showFpOverlay = d3.select("#show-fp-overlay").property("checked");
     const showCentroids = d3.select("#show-discrepancies").property("checked");
-    
-    // Assess Pseudo-Centroids active state specifically for Tab 1
-    const showPseudoCentroids = d3.select("#show-pseudo-centroids").property("checked");
-    const showPseudo = (fpMethod === 'centroids') && showPseudoCentroids;
-    
+    const showPseudoCentroids = d3.select("#show-pseudo-centroids").property("checked") && hideFpGlobal && fpMethod === 'centroids';
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
 
     d3.selectAll(".dot").each(function(p) {
@@ -259,6 +255,7 @@ function resetAllHovers() {
         // Skip 'X' symbol rendering on K-Means and Tab 2 charts entirely
         const isTab2Plot = plotClass && (plotClass.includes("pca2d") || plotClass.includes("mds2d"));
         const isKmeansPlot = plotClass && plotClass.includes("kmeans");
+        const isTab1Plot = plotClass && (plotClass.includes("pca") || plotClass.includes("mds")) && !isTab2Plot && !isKmeansPlot;
         const isFpOverlayTarget = hideFpGlobal && showFpOverlay && isFp && !isKmeansPlot && !isTab2Plot;
 
         let isHighlighted = false;
@@ -295,9 +292,14 @@ function resetAllHovers() {
                 } else {
                     targetOpacity = 0.9;
                 }
-            } else if (showPseudo && plotClass && ((plotClass.includes("pca") && !plotClass.includes("pca2d")) || (plotClass.includes("mds") && !plotClass.includes("mds2d")))) {
-                // If Pseudo-Centroids are visible, dim points that aren't FP in Tab 1 PCA and MDS
-                targetOpacity = isFp ? 1.0 : 0.15;
+            } else if (showPseudoCentroids && isTab1Plot) {
+                // Focus pseudo-centroid FPs: diminish non-FPs in Tab1
+                if (isFp) {
+                    isHighlighted = true;
+                    targetOpacity = 1.0;
+                } else {
+                    targetOpacity = 0.2;
+                }
             } else {
                 targetOpacity = 0.9;
             }
