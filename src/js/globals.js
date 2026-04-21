@@ -41,6 +41,10 @@ let origClusterAvg = {};
 let pcaKmeansAvg = {};
 let mdsKmeansAvg = {};
 
+// Pseudo-Centroids Storage for API Endpoint 4
+let pseudoCentroidsPCA = {};
+let pseudoCentroidsMDS = {};
+
 // Color Scales Configuration
 const customTableau = [...d3.schemeTableau10];
 customTableau[2] = '#2ca02c';
@@ -229,6 +233,11 @@ function resetAllHovers() {
     const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
     const showFpOverlay = d3.select("#show-fp-overlay").property("checked");
     const showCentroids = d3.select("#show-discrepancies").property("checked");
+    
+    // Assess Pseudo-Centroids active state specifically for Tab 1
+    const showPseudoCentroids = d3.select("#show-pseudo-centroids").property("checked");
+    const showPseudo = (fpMethod === 'centroids') && showPseudoCentroids;
+    
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
 
     d3.selectAll(".dot").each(function(p) {
@@ -286,6 +295,9 @@ function resetAllHovers() {
                 } else {
                     targetOpacity = 0.9;
                 }
+            } else if (showPseudo && plotClass && ((plotClass.includes("pca") && !plotClass.includes("pca2d")) || (plotClass.includes("mds") && !plotClass.includes("mds2d")))) {
+                // If Pseudo-Centroids are visible, dim points that aren't FP in Tab 1 PCA and MDS
+                targetOpacity = isFp ? 1.0 : 0.15;
             } else {
                 targetOpacity = 0.9;
             }

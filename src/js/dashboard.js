@@ -63,7 +63,7 @@ function initDashboard(folder) {
         const kmeans2dMap = new Map();
         if(kmeans2dData?.points) kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
 
-        // Format IDs to securely match across sources
+        // Parse incoming IDs firmly to String immediately to avoid mismatch during comparison
         const fpPcaSet = new Set((fpData?.false_positive_points_pca || []).map(String));
         const fpMdsSet = new Set((fpData?.false_positive_points_mds || []).map(String));
 
@@ -238,6 +238,15 @@ async function recomputeFP() {
         if (!response.ok) throw new Error("API request failed");
         const data = await response.json();
         
+        // Populate Pseudo Centroids for rendering if the method is 'centroids'
+        if (fpMethod === 'centroids' && data.pseudo_centroids_2d_pca) {
+            pseudoCentroidsPCA = data.pseudo_centroids_2d_pca;
+            pseudoCentroidsMDS = data.pseudo_centroids_2d_mds;
+        } else {
+            pseudoCentroidsPCA = {};
+            pseudoCentroidsMDS = {};
+        }
+        
         const fpPcaSet = new Set((data.false_positive_points_pca || []).map(String));
         const fpMdsSet = new Set((data.false_positive_points_mds || []).map(String));
         
@@ -248,10 +257,44 @@ async function recomputeFP() {
         
         applyFilters();
         
+        // Re-apply the pseudo-centroid rendering state
+        togglePseudoCentroids(d3.select("#show-pseudo-centroids").property("checked"));
+        
     } catch (err) {
         console.warn("API Error:", err);
     } finally {
         d3.select("#global-loader").classed("hidden-panel", true);
+    }
+}
+
+// Function to handle the rendering of pseudo-centroid crosses
+function togglePseudoCentroids(show) {
+    d3.selectAll(".pseudo-centroid-cross").remove();
+    
+    if (show && fpMethod === 'centroids') {
+        const drawCrosses = (plotId, centroidsObj) => {
+            const scales = scalesMap[plotId];
+            if (!scales || !centroidsObj) return;
+            const svgContainer = d3.select(`#${plotId}-plot svg g .centroid-layer`);
+            if (svgContainer.empty()) return;
+            
+            const crossData = Object.entries(centroidsObj).map(([label, coords]) => ({ label, x: coords[0], y: coords[1] }));
+            
+            svgContainer.selectAll(".pseudo-centroid-cross")
+                .data(crossData)
+                .enter()
+                .append("path")
+                .attr("class", "pseudo-centroid-cross")
+                .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
+                .attr("transform", d => `translate(${scales.currentXScale(d.x)}, ${scales.currentYScale(d.y)})`)
+                .style("fill", d => colorOriginal(d.label))
+                .style("stroke", "var(--sankey-node-stroke)")
+                .style("stroke-width", 1.5)
+                .style("pointer-events", "none");
+        };
+        
+        drawCrosses('pca', pseudoCentroidsPCA);
+        drawCrosses('mds', pseudoCentroidsMDS);
     }
 }
 
@@ -264,18 +307,11 @@ document.addEventListener("DOMContentLoaded", () => {
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
 
-    // False Positives Toggle Listener
     d3.select("#hide-fp-global").on("change", function() {
         const isChecked = this.checked;
         const currentTab = d3.select("input[name='mainTab']:checked").node().value;
         
-        // Auto uncheck Show FP if Hide FP is deactivated
-        if (!isChecked) {
-            d3.select("#show-fp-overlay").property("checked", false);
-        }
-
         if (isChecked) {
-            // Configuration menu is shown exclusively on Tab 1
             if (currentTab === 'nd') {
                 d3.select("#pc-plot").classed("hidden-panel", true);
                 d3.select("#fp-config-panel").classed("hidden-panel", false);
@@ -290,7 +326,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
     
-    // False Positives Overlay Listener
     d3.select("#show-fp-overlay").on("change", function() {
         applyFilters();
     });
@@ -299,7 +334,24 @@ document.addEventListener("DOMContentLoaded", () => {
         fpMethod = this.value;
         d3.selectAll(".fp-params-group").classed("hidden-panel", true);
         d3.select(`#fp-params-${fpMethod}`).classed("hidden-panel", false);
+        
+        // Expose Pseudo-Centroid options solely if the method is selected
+        if (fpMethod === 'centroids') {
+            d3.select("#pseudo-centroids-toggle-container").style("display", "flex");
+        } else {
+            d3.select("#pseudo-centroids-toggle-container").style("display", "none");
+            d3.select("#show-pseudo-centroids").property("checked", false);
+            togglePseudoCentroids(false);
+            resetAllHovers();
+        }
+        
         recomputeFP();
+    });
+    
+    // Listener for new pseudo-centroids feature
+    d3.select("#show-pseudo-centroids").on("change", function() {
+        togglePseudoCentroids(this.checked);
+        resetAllHovers();
     });
 
     d3.selectAll(".fp-param-input").on("change", recomputeFP);
@@ -440,6 +492,9 @@ function refreshAllVisualizations() {
     applyFilters();
 
     if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
+    
+    // Re-apply pseudo centroid rendering
+    togglePseudoCentroids(d3.select("#show-pseudo-centroids").property("checked"));
 
     if (selectedPoint) {
         updateSelection(selectedPoint, true);
@@ -570,12 +625,12 @@ function redrawKMeansPlot() {
     }
 }
 
-// Applies logical filters and sets CSS classes. Evaluates FP Overlays conditions and updates FP Counters.
+// Applies logical filters and sets CSS classes. Visually completely hides filtered elements.
 function applyFilters() {
     const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
+    const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     const showFpOverlay = d3.select("#show-fp-overlay").property("checked");
-    
-    // Static FP Tables logic 
+
     const pcaFpCount = dataset.filter(d => d.is_fp_pca && d.precision >= minPrecision && d.recall >= minRecall).length;
     const mdsFpCount = dataset.filter(d => d.is_fp_mds && d.precision >= minPrecision && d.recall >= minRecall).length;
     d3.select("#fp-count-pca").text(pcaFpCount);
@@ -584,7 +639,6 @@ function applyFilters() {
     d3.selectAll(".dot, .pc-line").each(function(d) {
         const self = d3.select(this);
         let isGeneralFiltered = (d.precision < minPrecision || d.recall < minRecall);
-        
         let isFpFiltered = false;
 
         // Apply FP hiding logic ONLY to PCA, MDS and Parallel Coordinates. Exclude K-Means and Tab 2 plots.
@@ -592,7 +646,7 @@ function applyFilters() {
             if (self.classed("dot-pca") && d.is_fp_pca) isFpFiltered = true;
             if (self.classed("dot-mds") && d.is_fp_mds) isFpFiltered = true;
             
-            // Explicitly ignore K-Means graphs (Tab 1 and Tab 2 elements) 
+            // Explicitly ignore K-Means graphs and Tab 2 elements
             if (self.classed("pc-line") && (d.is_fp_pca || d.is_fp_mds)) isFpFiltered = true;
         }
 
@@ -601,8 +655,12 @@ function applyFilters() {
         if (isGeneralFiltered) {
             self.classed("filtered-out", true).style("display", "none").style("pointer-events", "none");
         } else if (isFpFiltered) {
-            // Evaluates overlay toggles keeping standard points visually present but flagged as errors if requested
-            if (showFpOverlay && !self.classed("pc-line")) { 
+            // Check specific conditions for overlay: exclude K-means scatter and 2D charts entirely from visual alteration
+            const plotClass = self.attr("class");
+            const isTab2Plot = plotClass && (plotClass.includes("pca2d") || plotClass.includes("mds2d"));
+            const isKmeansPlot = plotClass && plotClass.includes("kmeans");
+            
+            if (showFpOverlay && !isKmeansPlot && !isTab2Plot && !self.classed("pc-line")) { 
                 self.classed("filtered-out", false).style("display", null);
             } else {
                 self.classed("filtered-out", true).style("display", "none").style("pointer-events", "none");
@@ -616,7 +674,6 @@ function applyFilters() {
         
     if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
     
-    const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     if (currentTab === '2d') {
          const activeData = brushedPointsGlobal.length > 1 
             ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall) 
@@ -632,7 +689,7 @@ function toggleDiscrepancies(show) {
     const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
 
     if (show) {
-        allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove()); 
+        allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll(".centroid-link, .centroid-cross").remove()); 
 
         Object.keys(plotMapping).forEach(plotId => {
             const scales = scalesMap[plotId];
@@ -676,6 +733,7 @@ function toggleDiscrepancies(show) {
             validKMeansClusters.forEach(k => {
                 if(centroids[k].count === 0) return;
                 svgContainer.append("path")
+                    .attr("class", "centroid-cross") // Specific class assignment to protect Pseudo-Centroids crosses 
                     .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
                     .attr("transform", `translate(${centroids[k].x}, ${centroids[k].y})`)
                     .style("fill", colorOriginal(k)) 
@@ -695,7 +753,7 @@ function toggleDiscrepancies(show) {
         if (!selectedPoint) updateConfusionMatrix(activePoints, currentTab);
         
     } else {
-        allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll("*").remove());
+        allPlots.forEach(selector => d3.select(`${selector} svg g .centroid-layer`).selectAll(".centroid-link, .centroid-cross").remove());
         resetAllHovers();
         d3.select("#confusion-matrix-container").classed("hidden-panel", true);
         if (!selectedPoint && brushedPointsGlobal.length === 0) {

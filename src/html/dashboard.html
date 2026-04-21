@@ -163,11 +163,20 @@
                         <h3 style="margin:0; font-size: 1rem;">False Positives Configuration</h3>
                     </div>
 
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <input type="checkbox" id="show-fp-overlay" name="show-fp-overlay" style="margin: 0; cursor: pointer;">
-                        <label for="show-fp-overlay" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--text-main); margin: 0;">
-                            Show FP
-                        </label>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <input type="checkbox" id="show-fp-overlay" name="show-fp-overlay" style="margin: 0; cursor: pointer;">
+                            <label for="show-fp-overlay" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--text-main); margin: 0;">
+                                Show FP
+                            </label>
+                        </div>
+                        
+                        <div id="pseudo-centroids-toggle-container" style="display: none; align-items: center; gap: 6px;">
+                            <input type="checkbox" id="show-pseudo-centroids" name="show-pseudo-centroids" style="margin: 0; cursor: pointer;">
+                            <label for="show-pseudo-centroids" style="font-size: 0.8rem; cursor: pointer; font-weight: bold; color: var(--text-main); margin: 0;">
+                                Show Pseudo-Centroids
+                            </label>
+                        </div>
                     </div>
                 </div>
                 
