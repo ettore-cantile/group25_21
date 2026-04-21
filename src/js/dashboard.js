@@ -213,7 +213,7 @@ async function recomputeFP() {
     d3.select("#global-loader").classed("hidden-panel", false);
 
     try {
-        const response = await fetch(`${baseUrl}/api/compute_fp`, {
+        const response = await fetch(`${baseUrl}/api/compute_fp_weighted`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

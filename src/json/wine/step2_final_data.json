@@ -6,11 +6,13 @@
             "global_f_score": 0.385,
             "pca": {
                 "trustworthiness": 0.8974,
-                "continuity": 0.9428
+                "continuity": 0.9428,
+                "stress": 0.2867
             },
             "mds": {
                 "trustworthiness": 0.919,
-                "continuity": 0.9431
+                "continuity": 0.9431,
+                "stress": 0.229
             }
         },
         "projections_included": [

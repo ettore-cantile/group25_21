@@ -1,9 +1,11 @@
 import os
 import json
+import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.manifold import MDS, trustworthiness
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import pairwise_distances
 
 # --- CONFIGURATION ---
 DATASETS = ["wine", "iris", "user_knowledge"]
@@ -14,6 +16,30 @@ LABEL_INDEX = {
     "iris": -1,
     "user_knowledge": -1
 }
+
+def calculate_normalized_stress(X_high, X_low):
+    """
+    Calcola lo stress normalizzato usando il fattore di scala alpha, 
+    rispettando la condizione i < j (solo triangolo superiore della matrice).
+    """
+    # Calcola le matrici di distanza complete
+    d_high_matrix = pairwise_distances(X_high, metric='euclidean')
+    d_low_matrix = pairwise_distances(X_low, metric='euclidean')
+    
+    # Estrae solo il triangolo superiore (escludendo la diagonale con k=1) per avere i < j
+    idx = np.triu_indices_from(d_high_matrix, k=1)
+    d_high = d_high_matrix[idx]
+    d_low = d_low_matrix[idx]
+    
+    # Calcolo di alpha: sum(d_ij * delta_ij) / sum(delta_ij^2)
+    # Aggiungiamo un piccolo epsilon al denominatore per evitare divisioni per zero
+    alpha = np.sum(d_high * d_low) / (np.sum(d_low ** 2) + 1e-10)
+    
+    # Calcolo dello stress
+    stress = np.sqrt(np.sum((d_high - alpha * d_low) ** 2) / np.sum(d_high ** 2))
+    
+    return float(stress)
+
 
 def run_projections_for_dataset(dataset_name):
     print(f"\n--- Processing Projections for: {dataset_name.upper()} ---")
@@ -50,14 +76,20 @@ def run_projections_for_dataset(dataset_name):
     mds_trust = trustworthiness(X_scaled, mds_coords, n_neighbors=k_val)
     pca_cont = trustworthiness(pca_coords, X_scaled, n_neighbors=k_val)
     mds_cont = trustworthiness(mds_coords, X_scaled, n_neighbors=k_val)
+    
+    # Calculate Stress (Aggiunta)
+    pca_stress = calculate_normalized_stress(X_scaled, pca_coords)
+    mds_stress = calculate_normalized_stress(X_scaled, mds_coords)
 
     data["metadata"]["global_assessment"]["pca"] = {
-        "trustworthiness": round(pca_trust, 4),
-        "continuity": round(pca_cont, 4)
+        "trustworthiness": round(float(pca_trust), 4),
+        "continuity": round(float(pca_cont), 4),
+        "stress": round(pca_stress, 4)
     }
     data["metadata"]["global_assessment"]["mds"] = {
-        "trustworthiness": round(mds_trust, 4),
-        "continuity": round(mds_cont, 4)
+        "trustworthiness": round(float(mds_trust), 4),
+        "continuity": round(float(mds_cont), 4),
+        "stress": round(mds_stress, 4)
     }
 
     # Inject 2D coordinates into the JSON

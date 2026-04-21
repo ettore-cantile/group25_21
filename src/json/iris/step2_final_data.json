@@ -6,11 +6,13 @@
             "global_f_score": 0.4216,
             "pca": {
                 "trustworthiness": 0.9827,
-                "continuity": 0.9919
+                "continuity": 0.9919,
+                "stress": 0.0597
             },
             "mds": {
                 "trustworthiness": 0.9847,
-                "continuity": 0.9922
+                "continuity": 0.9922,
+                "stress": 0.0511
             }
         },
         "projections_included": [
@@ -3610,6 +3612,7 @@
             "recall": 0.3061,
             "f_score": 0.4687,
             "neighbors": [
+                101,
                 103,
                 104,
                 111,
@@ -3621,7 +3624,6 @@
                 132,
                 133,
                 137,
-                142,
                 145,
                 146,
                 147
