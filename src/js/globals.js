@@ -58,7 +58,6 @@ const colorFScore = d3.scaleQuantize().domain([0, 1]).range(rdYlGnDiscrete);
 const gauges = { precision: { foreground: null }, recall: { foreground: null }, fscore: { foreground: null } };
 const gaugeAngleScale = d3.scaleLinear().domain([0, 1]).range([-Math.PI / 2, Math.PI / 2]);
 
-
 // --- UTILITIES ---
 
 // Clears all Parallel Coordinates brushes safely and resyncs the tracking maps
@@ -77,21 +76,68 @@ function getLineColor(d) {
     return getColor(d);
 }
 
-// Generates the SVG path string for a point, handles anomaly triangles and hover scaling
+// Custom D3 shape generator for marking False Positives with an 'X'
+const symbolX = {
+    draw: function(context, size) {
+        const r = Math.sqrt(size) * 0.6; // Scale factor mapping to traditional symbol areas
+        const w = r * 0.25; // Line thickness
+        
+        // Define coordinates for a simple cross centered at 0,0
+        const pts = [
+            [-w, -r], [w, -r], [w, -w], [r, -w], [r, w], [w, w], 
+            [w, r], [-w, r], [-w, w], [-r, w], [-r, -w], [-w, -w]
+        ];
+        
+        // Rotate points by 45 degrees to form an X
+        const rotated = pts.map(([x, y]) => [
+            (x - y) * 0.707, 
+            (x + y) * 0.707
+        ]);
+        
+        context.moveTo(rotated[0][0], rotated[0][1]);
+        for (let i = 1; i < rotated.length; i++) {
+            context.lineTo(rotated[i][0], rotated[i][1]);
+        }
+        context.closePath();
+    }
+};
+
+// Generates the SVG path string for a point, handles anomaly triangles, hover scaling, and FP Overlays
 function getSymbolPath(plotClass, d, isHovered = false, overrideR = null) {
     const showAnon = d3.select("#show-anomalies").property("checked");
+    const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
+    const showFpOverlay = d3.select("#show-fp-overlay").property("checked");
+
     let isAnom = false;
+    let isFp = false;
     
-    if (plotClass && plotClass.includes("pca2d")) isAnom = d.pca_is_anomaly;
-    else if (plotClass && plotClass.includes("mds2d")) isAnom = d.mds_is_anomaly;
-    else if (plotClass && plotClass.includes("kmeans")) isAnom = d.is_anomaly;
+    // Evaluate properties based on the specific plot context
+    if (plotClass && plotClass.includes("pca2d")) { isAnom = d.pca_is_anomaly; isFp = d.is_fp_pca; }
+    else if (plotClass && plotClass.includes("mds2d")) { isAnom = d.mds_is_anomaly; isFp = d.is_fp_mds; }
+    else if (plotClass && plotClass.includes("kmeans")) { 
+        isAnom = d.is_anomaly; 
+        isFp = (kmeansProjectionSource === 'pca' ? d.is_fp_pca : d.is_fp_mds); 
+    }
+    else if (plotClass && plotClass.includes("pca")) isFp = d.is_fp_pca;
+    else if (plotClass && plotClass.includes("mds")) isFp = d.is_fp_mds;
     
     let r = currentPointSize;
     if (overrideR !== null) r = overrideR;
     else if (isHovered) r = currentPointSize * 2.0;
     
     const area = Math.PI * Math.pow(r, 2) * ((showAnon && isAnom) ? 1.5 : 1);
-    const type = (showAnon && isAnom) ? d3.symbolTriangle : d3.symbolCircle;
+    
+    let type = d3.symbolCircle;
+    
+    // Check specific conditions for overlay: exclude K-means scatter and 2D charts entirely from visual alteration
+    const isTab2Plot = plotClass && (plotClass.includes("pca2d") || plotClass.includes("mds2d"));
+    const isKmeansPlot = plotClass && plotClass.includes("kmeans");
+
+    if (hideFpGlobal && showFpOverlay && isFp && !isKmeansPlot && !isTab2Plot) {
+        type = symbolX;
+    } else if (showAnon && isAnom) {
+        type = d3.symbolTriangle;
+    }
     
     return d3.symbol().type(type).size(area)();
 }
@@ -180,18 +226,31 @@ function updateDatasetSelectWidth() {
 // Dynamically evaluates and applies Fill, Stroke, and Opacity to all points
 function resetAllHovers() {
     const showAnon = d3.select("#show-anomalies").property("checked");
+    const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
+    const showFpOverlay = d3.select("#show-fp-overlay").property("checked");
     const showCentroids = d3.select("#show-discrepancies").property("checked");
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
 
     d3.selectAll(".dot").each(function(p) {
         const self = d3.select(this);
-        const isFilteredFP = self.classed("filtered-fp");
         const plotClass = self.attr("class");
         
         let isAnom = false;
-        if (plotClass && plotClass.includes("pca2d")) isAnom = p.pca_is_anomaly;
-        else if (plotClass && plotClass.includes("mds2d")) isAnom = p.mds_is_anomaly;
-        else if (plotClass && plotClass.includes("kmeans")) isAnom = p.is_anomaly;
+        let isFp = false;
+        
+        if (plotClass && plotClass.includes("pca2d")) { isAnom = p.pca_is_anomaly; isFp = p.is_fp_pca; }
+        else if (plotClass && plotClass.includes("mds2d")) { isAnom = p.mds_is_anomaly; isFp = p.is_fp_mds; }
+        else if (plotClass && plotClass.includes("kmeans")) { 
+            isAnom = p.is_anomaly; 
+            isFp = (kmeansProjectionSource === 'pca' ? p.is_fp_pca : p.is_fp_mds);
+        }
+        else if (plotClass && plotClass.includes("pca")) isFp = p.is_fp_pca;
+        else if (plotClass && plotClass.includes("mds")) isFp = p.is_fp_mds;
+
+        // Skip 'X' symbol rendering on K-Means and Tab 2 charts entirely
+        const isTab2Plot = plotClass && (plotClass.includes("pca2d") || plotClass.includes("mds2d"));
+        const isKmeansPlot = plotClass && plotClass.includes("kmeans");
+        const isFpOverlayTarget = hideFpGlobal && showFpOverlay && isFp && !isKmeansPlot && !isTab2Plot;
 
         let isHighlighted = false;
         let targetOpacity = 0.9;
@@ -232,14 +291,18 @@ function resetAllHovers() {
             }
         }
 
-        // Calculate Base Colors
+        // Calculate Base Colors based on interactions and overlay states
         let baseColor = getColor(p);
         if (colorMode === 'original' && showAnon && isAnom) baseColor = 'var(--anomaly-color)';
+        if (isFpOverlayTarget) baseColor = 'var(--fp-x-color)';
+
+        let sColor = isSelected ? "var(--hover-stroke)" : "var(--dot-stroke)";
+        if (isFpOverlayTarget) sColor = 'var(--fp-x-color)';
 
         // Apply visual properties
         self.attr("d", getSymbolPath(plotClass, p, isSelected))
             .style("fill", baseColor)
-            .style("stroke", isSelected ? "var(--hover-stroke)" : "var(--dot-stroke)")
+            .style("stroke", sColor)
             .style("stroke-width", isSelected ? 2 : 0.8)
             .style("opacity", targetOpacity)
             .style("pointer-events", targetOpacity > 0 ? "auto" : "none"); 

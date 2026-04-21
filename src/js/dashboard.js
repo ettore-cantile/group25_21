@@ -63,7 +63,7 @@ function initDashboard(folder) {
         const kmeans2dMap = new Map();
         if(kmeans2dData?.points) kmeans2dData.points.forEach(p => kmeans2dMap.set(p.id, p));
 
-        // FIX: Ensuring all incoming False Positive IDs are parsed strictly as strings to match dataset IDs.
+        // Format IDs to securely match across sources
         const fpPcaSet = new Set((fpData?.false_positive_points_pca || []).map(String));
         const fpMdsSet = new Set((fpData?.false_positive_points_mds || []).map(String));
 
@@ -238,7 +238,6 @@ async function recomputeFP() {
         if (!response.ok) throw new Error("API request failed");
         const data = await response.json();
         
-        // FIX: Parse incoming IDs firmly to String immediately to avoid mismatch during comparison
         const fpPcaSet = new Set((data.false_positive_points_pca || []).map(String));
         const fpMdsSet = new Set((data.false_positive_points_mds || []).map(String));
         
@@ -265,25 +264,35 @@ document.addEventListener("DOMContentLoaded", () => {
     initGauge("#gauge-fscore", gauges.fscore);
     enhanceColorModeSwitcher();
 
+    // False Positives Toggle Listener
     d3.select("#hide-fp-global").on("change", function() {
         const isChecked = this.checked;
+        const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+        
+        // Auto uncheck Show FP if Hide FP is deactivated
+        if (!isChecked) {
+            d3.select("#show-fp-overlay").property("checked", false);
+        }
+
         if (isChecked) {
-            d3.select("#pc-plot").classed("hidden-panel", true);
-            d3.select("#fp-config-panel").classed("hidden-panel", false);
-            d3.select("#app-grid").classed("show-fp-config", true);
-            d3.select("#pc-panel").classed("hidden-panel", false);
+            // Configuration menu is shown exclusively on Tab 1
+            if (currentTab === 'nd') {
+                d3.select("#pc-plot").classed("hidden-panel", true);
+                d3.select("#fp-config-panel").classed("hidden-panel", false);
+            }
             recomputeFP();
         } else {
-            d3.select("#pc-plot").classed("hidden-panel", false);
-            d3.select("#fp-config-panel").classed("hidden-panel", true);
-            d3.select("#app-grid").classed("show-fp-config", false);
-            
-            const currentTab = d3.select("input[name='mainTab']:checked").node().value;
-            if (currentTab === '2d') {
-                d3.select("#pc-panel").classed("hidden-panel", true);
+            if (currentTab === 'nd') {
+                d3.select("#pc-plot").classed("hidden-panel", false);
+                d3.select("#fp-config-panel").classed("hidden-panel", true);
             }
             applyFilters();
         }
+    });
+    
+    // False Positives Overlay Listener
+    d3.select("#show-fp-overlay").on("change", function() {
+        applyFilters();
     });
 
     d3.select("#fp-method-select").on("change", function() {
@@ -363,6 +372,7 @@ function refreshAllVisualizations() {
     if (!dataset || dataset.length === 0) return;
 
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
+    const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
 
     brushPCA = d3.brush();
     brushMDS = d3.brush();
@@ -406,17 +416,24 @@ function refreshAllVisualizations() {
         return getColor(d);
     });
 
+    // Reset visibility logic based on current active tab
     if (currentTab === 'nd') {
         d3.select("#app-grid").classed("mode-2d", false);
         d3.selectAll(".tab-nd").classed("hidden-panel", false);
         d3.selectAll(".tab-2d").classed("hidden-panel", true);
+        
+        if (hideFpGlobal) {
+            d3.select("#pc-plot").classed("hidden-panel", true);
+            d3.select("#fp-config-panel").classed("hidden-panel", false);
+        } else {
+            d3.select("#pc-plot").classed("hidden-panel", false);
+            d3.select("#fp-config-panel").classed("hidden-panel", true);
+        }
     } else {
         d3.select("#app-grid").classed("mode-2d", true);
         d3.selectAll(".tab-nd").classed("hidden-panel", true);
         d3.selectAll(".tab-2d").classed("hidden-panel", false);
-        if (d3.select("#hide-fp-global").property("checked")) {
-            d3.select("#pc-panel").classed("hidden-panel", false);
-        }
+        d3.select("#fp-config-panel").classed("hidden-panel", true); 
     }
 
     setupBrushing();
@@ -482,6 +499,7 @@ d3.selectAll("input[name='sankeyMode']").on("change", function() {
     }
 });
 
+// Dynamic Tab View Switcher
 d3.selectAll("input[name='mainTab']").on("change", function() {
     const selectedTab = this.value;
     const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
@@ -491,6 +509,7 @@ d3.selectAll("input[name='mainTab']").on("change", function() {
         d3.selectAll(".tab-nd").classed("hidden-panel", false);
         d3.selectAll(".tab-2d").classed("hidden-panel", true);
         
+        // Return configuration panels if active
         if (hideFpGlobal) {
             d3.select("#pc-plot").classed("hidden-panel", true);
             d3.select("#fp-config-panel").classed("hidden-panel", false);
@@ -503,11 +522,9 @@ d3.selectAll("input[name='mainTab']").on("change", function() {
         d3.select("#app-grid").classed("mode-2d", true);
         d3.selectAll(".tab-nd").classed("hidden-panel", true);
         d3.selectAll(".tab-2d").classed("hidden-panel", false);
+        d3.select("#fp-config-panel").classed("hidden-panel", true); // Guarantee hidden state
         
-        if (hideFpGlobal) {
-            d3.select("#pc-panel").classed("hidden-panel", false);
-        }
-        
+        // Ensure FP configuration interface is never rendered under 2D conditions
         const activeData = brushedPointsGlobal.length > 1 
             ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall)
             : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
@@ -553,18 +570,16 @@ function redrawKMeansPlot() {
     }
 }
 
-// Applies logical filters and sets CSS classes. Visually completely hides filtered elements.
+// Applies logical filters and sets CSS classes. Evaluates FP Overlays conditions and updates FP Counters.
 function applyFilters() {
     const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
-
-    const countFpPca = dataset.filter(d => d.is_fp_pca && d.precision >= minPrecision && d.recall >= minRecall).length;
-    const countFpMds = dataset.filter(d => d.is_fp_mds && d.precision >= minPrecision && d.recall >= minRecall).length;
-
-    const labelGlobal = d3.select("label[for='hide-fp-global']");
-    if (!labelGlobal.empty()) {
-        const baseText = labelGlobal.text().replace(/\s*\(\d+\/\d+\)$/, "");
-        labelGlobal.text(hideFpGlobal ? `${baseText} (${countFpPca}/${countFpMds})` : baseText);
-    }
+    const showFpOverlay = d3.select("#show-fp-overlay").property("checked");
+    
+    // Static FP Tables logic 
+    const pcaFpCount = dataset.filter(d => d.is_fp_pca && d.precision >= minPrecision && d.recall >= minRecall).length;
+    const mdsFpCount = dataset.filter(d => d.is_fp_mds && d.precision >= minPrecision && d.recall >= minRecall).length;
+    d3.select("#fp-count-pca").text(pcaFpCount);
+    d3.select("#fp-count-mds").text(mdsFpCount);
 
     d3.selectAll(".dot, .pc-line").each(function(d) {
         const self = d3.select(this);
@@ -572,25 +587,26 @@ function applyFilters() {
         
         let isFpFiltered = false;
 
-        // FIX: Consistently apply logic across all target plots completely hiding the FP nodes
+        // Apply FP hiding logic ONLY to PCA, MDS and Parallel Coordinates. Exclude K-Means and Tab 2 plots.
         if (hideFpGlobal) {
             if (self.classed("dot-pca") && d.is_fp_pca) isFpFiltered = true;
             if (self.classed("dot-mds") && d.is_fp_mds) isFpFiltered = true;
-            if (self.classed("dot-pca2d") && d.is_fp_pca) isFpFiltered = true;
-            if (self.classed("dot-mds2d") && d.is_fp_mds) isFpFiltered = true;
             
-            if (self.classed("dot-kmeans")) {
-                if (kmeansProjectionSource === 'pca' && d.is_fp_pca) isFpFiltered = true;
-                if (kmeansProjectionSource === 'mds' && d.is_fp_mds) isFpFiltered = true;
-            }
-            
+            // Explicitly ignore K-Means graphs (Tab 1 and Tab 2 elements) 
             if (self.classed("pc-line") && (d.is_fp_pca || d.is_fp_mds)) isFpFiltered = true;
         }
 
         self.classed("filtered-fp", isFpFiltered);
 
-        if (isGeneralFiltered || isFpFiltered) {
+        if (isGeneralFiltered) {
             self.classed("filtered-out", true).style("display", "none").style("pointer-events", "none");
+        } else if (isFpFiltered) {
+            // Evaluates overlay toggles keeping standard points visually present but flagged as errors if requested
+            if (showFpOverlay && !self.classed("pc-line")) { 
+                self.classed("filtered-out", false).style("display", null);
+            } else {
+                self.classed("filtered-out", true).style("display", "none").style("pointer-events", "none");
+            }
         } else {
             self.classed("filtered-out", false).style("display", null);
         }
@@ -603,8 +619,8 @@ function applyFilters() {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     if (currentTab === '2d') {
          const activeData = brushedPointsGlobal.length > 1 
-            ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall && (!hideFpGlobal || (!d.is_fp_pca && !d.is_fp_mds))) 
-            : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall && (!hideFpGlobal || (!d.is_fp_pca && !d.is_fp_mds)));
+            ? brushedPointsGlobal.filter(d => d.precision >= minPrecision && d.recall >= minRecall) 
+            : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
          drawSankeyDiagram("#comparison-plot", activeData);
     }
 }
@@ -634,12 +650,6 @@ function toggleDiscrepancies(show) {
 
             dataset.forEach(d => {
                 if(d.precision >= minPrecision && d.recall >= minRecall && d[clusterProp] !== undefined) {
-                    if (hideFpGlobal) {
-                        if (isPCA2D && d.is_fp_pca) return;
-                        if (isMDS2D && d.is_fp_mds) return;
-                        if (!isPCA2D && !isMDS2D && ((kmeansProjectionSource === 'pca' && d.is_fp_pca) || (kmeansProjectionSource === 'mds' && d.is_fp_mds))) return;
-                    }
-
                     centroids[d[clusterProp]].x += scales.xScale(d[scales.xKey]);
                     centroids[d[clusterProp]].y += scales.yScale(d[scales.yKey]);
                     centroids[d[clusterProp]].count += 1;
@@ -657,12 +667,6 @@ function toggleDiscrepancies(show) {
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
 
-                if (hideFpGlobal) {
-                    if (isPCA2D && d.is_fp_pca) return;
-                    if (isMDS2D && d.is_fp_mds) return;
-                    if (!isPCA2D && !isMDS2D && ((kmeansProjectionSource === 'pca' && d.is_fp_pca) || (kmeansProjectionSource === 'mds' && d.is_fp_mds))) return;
-                }
-                
                 svgContainer.append("line")
                     .attr("x1", scales.xScale(d[scales.xKey])).attr("y1", scales.yScale(d[scales.yKey]))
                     .attr("x2", centroids[d[clusterProp]].x).attr("y2", centroids[d[clusterProp]].y)
@@ -684,7 +688,7 @@ function toggleDiscrepancies(show) {
 
         let activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
         
-        if (hideFpGlobal) {
+        if (hideFpGlobal && currentTab === 'nd') {
              activePoints = activePoints.filter(d => !d.is_fp_pca && !d.is_fp_mds);
         }
 
@@ -711,7 +715,6 @@ function updateSelection(d, skipNeighborGraph = false) {
     selectedPoint = d;
     brushedPointsGlobal = []; 
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
-    const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
 
     [brushPCA, brushMDS, brushKMeans, brushPCA2D, brushMDS2D].forEach(b => {
         d3.selectAll(".brush-group").call(b.move, null);
@@ -761,8 +764,8 @@ function updateSelection(d, skipNeighborGraph = false) {
         drawRadarChart(d);
         d3.selectAll(".link-group line").remove();
 
-        const baseDataset = dataset.filter(p => p.precision >= minPrecision && p.recall >= minRecall && (!hideFpGlobal || (!p.is_fp_pca && !p.is_fp_mds)));
-        drawSankeyDiagram("#comparison-plot", baseDataset);
+        const baseDatasetTab2 = dataset.filter(p => p.precision >= minPrecision && p.recall >= minRecall);
+        drawSankeyDiagram("#comparison-plot", baseDatasetTab2);
         
         resetAllHovers();
     }
@@ -824,9 +827,9 @@ function handleBrush(event, brushObj, xKey, yKey) {
     dataset.forEach(d => {
         if(d.precision < minPrecision || d.recall < minRecall) return;
         
-        // Skip hidden points inside brush
+        // Skip hidden points inside brush, EXCEPT if interacting directly with K-Means or Tab 2 plots
         const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
-        if (hideFpGlobal) {
+        if (hideFpGlobal && brushObj !== brushKMeans && brushObj !== brushPCA2D && brushObj !== brushMDS2D) {
             if (xKey.includes('pca') && d.is_fp_pca) return;
             if (xKey.includes('mds') && d.is_fp_mds) return;
         }
@@ -846,7 +849,9 @@ function updateLiveAnalytics(selectedPoints) {
     const currentTab = d3.select("input[name='mainTab']:checked").node().value;
     const isAnomalyOn = d3.select("#show-discrepancies").property("checked");
     const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
-    const baseDataset = dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall && (!hideFpGlobal || (!d.is_fp_pca && !d.is_fp_mds)));
+    
+    const baseDatasetTab1 = dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall && (!hideFpGlobal || (!d.is_fp_pca && !d.is_fp_mds)));
+    const baseDatasetTab2 = dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
 
     if (currentTab === '2d') {
         d3.select("#gauges-container").classed("hidden-panel", true);
@@ -866,7 +871,7 @@ function updateLiveAnalytics(selectedPoints) {
                 d3.select("#empty-state-placeholder").classed("hidden-panel", true);
                 d3.select("#radar-empty-state").classed("hidden-panel", true);
                 d3.select("#confusion-matrix-container").classed("hidden-panel", false);
-                updateConfusionMatrix(selectedPoints.length > 1 ? selectedPoints : baseDataset, '2d');
+                updateConfusionMatrix(selectedPoints.length > 1 ? selectedPoints : baseDatasetTab2, '2d');
             } else {
                 d3.select("#confusion-matrix-container").classed("hidden-panel", true);
                 d3.select("#empty-state-placeholder").classed("hidden-panel", true);
@@ -875,7 +880,7 @@ function updateLiveAnalytics(selectedPoints) {
             }
         }
         
-        const activeData = selectedPoints.length > 1 ? selectedPoints : baseDataset;
+        const activeData = selectedPoints.length > 1 ? selectedPoints : baseDatasetTab2;
         drawSankeyDiagram("#comparison-plot", activeData);
         return;
     }
@@ -891,7 +896,7 @@ function updateLiveAnalytics(selectedPoints) {
         if (isAnomalyOn) {
             d3.select("#empty-state-placeholder").classed("hidden-panel", true);
             d3.select("#confusion-matrix-container").classed("hidden-panel", false);
-            updateConfusionMatrix(baseDataset, currentTab);
+            updateConfusionMatrix(baseDatasetTab1, currentTab);
         } else {
             d3.select("#confusion-matrix-container").classed("hidden-panel", true);
             d3.select("#empty-state-placeholder").classed("hidden-panel", false);

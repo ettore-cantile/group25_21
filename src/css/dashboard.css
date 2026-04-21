@@ -42,6 +42,9 @@
     --neighbor-link: #999999;
     --neighbor-node-stroke: #ffffff;
     --fb-accent: #2980b9;
+
+    /* Theme adaptive color for False Positives 'X' marker */
+    --fp-x-color: #000000;
     
     --grid-gap: clamp(6px, 1vmin, 10px);
 }
@@ -90,6 +93,9 @@
     --neighbor-link: #6b7280;
     --neighbor-node-stroke: #21222d;
     --fb-accent: #00d2ff;
+
+    /* Theme adaptive color for False Positives 'X' marker */
+    --fp-x-color: #ffffff;
 }
 
 * { box-sizing: border-box; }
@@ -104,6 +110,7 @@ body {
     transition: background-color 0.4s ease, color 0.4s ease;
 }
 
+/* Master grid layout structure */
 #app-grid {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
@@ -127,15 +134,7 @@ body {
     grid-template-rows: auto auto minmax(0, 1fr) minmax(0, 1fr);
 }
 
-#app-grid.mode-2d.show-fp-config {
-    grid-template-areas: 
-        "header header" 
-        "controls controls" 
-        "plots analytics" 
-        "pc pc";
-    grid-template-rows: auto auto minmax(0, 1.5fr) minmax(0, 0.4fr);
-}
-
+/* Header UI Elements */
 .header {
     grid-area: header;
     background-color: var(--bg-panel);
@@ -203,6 +202,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     background-color: var(--control-sel-bg); color: var(--control-sel-text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
+/* Control section styling */
 .top-controls {
     grid-area: controls; background: var(--bg-panel); padding: clamp(4px, 1vh, 10px) clamp(10px, 1.5vw, 20px);
     display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between;
@@ -221,6 +221,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 }
 .segmented-control input[type="radio"]:checked + label { background-color: var(--control-sel-bg); color: var(--control-sel-text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
 
+/* Legend section */
 .controls-right { display: flex; flex-direction: column; justify-content: center; flex: 0 1 auto; padding-left: clamp(5px, 1vw, 10px); min-width: 200px; }
 #legend-gradient { height: 14px; border-radius: 4px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; }
 .legend-color-block { flex: 1; height: 100%; transition: background-color 0.4s ease; }
@@ -229,6 +230,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 .legend-cluster-dot { width: clamp(6px, 1vw, 10px); height: clamp(6px, 1vw, 10px); border-radius: 50%; border: 1px solid var(--border-color); flex-shrink: 0; transition: background-color 0.4s ease; }
 .legend-labels { display: flex !important; justify-content: space-between; font-size: clamp(0.45rem, 0.8vw, 0.7rem); margin-top: 4px; font-weight: bold; color: var(--text-muted); width: 100%; }
 
+/* Grid containers */
 #plots-grid, #plots-grid-2d { 
     grid-area: plots; display: grid; 
     gap: var(--grid-gap); 
@@ -259,6 +261,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     min-height: 0; padding-top: 5px; 
 }
 
+/* --- COMPACT FALSE POSITIVES CONFIGURATION PANEL --- */
 #fp-config-panel {
     display: flex; 
     flex-direction: column; 
@@ -268,15 +271,125 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     height: 100%; 
     background: var(--bg-panel); 
     color: var(--text-title);
-    padding: 10px;
+    padding: 10px 20px; 
+}
+
+.fp-config-header {
+    display: flex;
+    align-items: center;
+    justify-content: center; 
+    gap: 20px;
+    width: 100%; 
+    margin-bottom: 8px;
+}
+
+.fp-config-wrapper {
+    display: flex; 
+    flex-direction: row; 
+    align-items: stretch; 
+    gap: 20px; 
+    width: 100%; 
+    max-width: 800px;  /* Ensures panel is not exceedingly wide */
+    margin: 0 auto;    /* Centers the panel perfectly matching PC plot width logic */
+    justify-content: center;
+}
+
+.fp-config-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--control-bg); 
+    padding: 8px 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.fp-control-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fp-control-block label {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.fp-divider {
+    width: 1px; 
+    height: 35px; 
+    background: var(--border-color); 
+    margin: 0 5px;
 }
 
 .fp-params-group {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 15px;
 }
 
+.fp-num-input {
+    width: 75px;
+    text-align: center;
+    padding: 4px 8px !important;
+}
+
+/* FP Table Sub-component Styles */
+.fp-summary-box {
+    background: var(--control-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+    padding: 8px 15px;
+    display: flex;
+    align-items: center;
+    min-width: 180px;
+}
+
+.fp-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.fp-summary-table th {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 5px;
+    font-size: 0.65rem;
+}
+
+.fp-summary-table td {
+    padding-top: 5px;
+    color: var(--text-main);
+}
+
+/* Base input styles API configurations */
+.input-style {
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    color: var(--text-title);
+    border-radius: 6px;
+    padding: 4px 8px;
+    outline: none;
+    font-family: inherit;
+    font-size: 0.85rem;
+    transition: border-color 0.3s ease, background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.input-style:focus {
+    border-color: var(--control-sel-text);
+    box-shadow: 0 0 0 2px rgba(41, 128, 185, 0.2);
+}
+
+/* Parallel Coordinates styling */
 .pc-axis path, .pc-axis line { stroke: var(--text-title) !important; stroke-width: 2px; }
 .pc-axis text { 
     fill: var(--text-main) !important; 
@@ -292,6 +405,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 .sankey-link { transition: stroke-opacity 0.4s ease; cursor: pointer; }
 .sankey-node { cursor: pointer; transition: fill 0.4s ease; }
 
+/* Dynamic analytical panels */
 #panel-dynamic { 
     grid-area: analytics; 
     margin-right: var(--grid-gap); 
@@ -311,6 +425,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 
 .hidden-panel { display: none !important; }
 
+/* Placeholder states */
 .placeholder-content { 
     text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; 
     min-height: 0; flex-shrink: 0; gap: clamp(2px, 0.8vh, 6px);
@@ -331,57 +446,39 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     color: var(--text-muted); line-height: 1.1; 
 }
 
-.global-overview-header {
-    display: flex; flex-direction: column; align-items: center; text-align: center;
-    padding: 0 0 clamp(4px, 1.2vh, 10px) 0;
-    gap: clamp(2px, 0.8vh, 4px);
-    border-bottom: 1px solid var(--border-color);
-    width: 100%;
-    margin-bottom: clamp(4px, 1.2vh, 10px);
-    flex-shrink: 0;
-}
-.global-overview-header svg {
-    stroke: var(--text-muted);
-    width: clamp(20px, 4vh, 32px);
-    height: clamp(20px, 4vh, 32px);
-}
-.global-overview-header p {
-    margin: 0; font-weight: bold; 
-    font-size: clamp(0.7rem, 1.5vh + 0.3vw, 1rem); 
-    color: var(--text-title); line-height: 1.1; 
-}
-.global-overview-header span {
-    font-size: clamp(0.55rem, 1vh + 0.3vw, 0.8rem); 
-    color: var(--text-muted); line-height: 1.1; 
-}
-
+/* Centralized global stats grid (Header removed) */
 .global-stats-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-rows: minmax(0, 1fr); 
-    gap: clamp(2px, 0.6vh, 4px); 
+    gap: clamp(4px, 1vh, 8px); 
     width: 100%;
     flex: 1; 
     min-height: 0; 
+    align-content: center; 
 }
 
 .global-stat-card {
     display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; 
-    padding: clamp(1px, 0.4vh, 3px) 2px; 
+    padding: clamp(4px, 1vh, 8px) 4px; 
     background: var(--bg-main); border-radius: 6px; 
     border: 1px solid var(--border-color); 
     min-width: 0; min-height: 0; 
-    transition: background-color 0.4s ease, border-color 0.4s ease; box-sizing: border-box;
-    gap: clamp(1px, 0.3vh, 2px); 
+    transition: background-color 0.4s ease, border-color 0.4s ease, transform 0.2s ease; box-sizing: border-box;
+    gap: clamp(2px, 0.5vh, 4px); 
+}
+.global-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 .global-stat-card h4 { 
     margin: 0; color: var(--text-muted); 
-    font-size: clamp(0.35rem, 0.6vh + 0.2vw, 0.55rem); 
+    font-size: clamp(0.4rem, 0.8vh + 0.2vw, 0.65rem); 
     text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
-    line-height: 1.1; width: 100%; 
+    line-height: 1.2; width: 100%; 
 }
 .global-stat-card .val { 
-    font-size: clamp(0.6rem, 1.2vh + 0.3vw, 0.95rem); 
+    font-size: clamp(0.8rem, 1.6vh + 0.3vw, 1.2rem); 
     font-weight: bold; 
     margin: 0; color: var(--text-title); line-height: 1; 
 }
@@ -390,10 +487,11 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     grid-column: 1 / span 2; 
     border-color: var(--fb-accent) !important; 
     background: transparent !important;
+    padding: clamp(6px, 1.5vh, 12px) 4px; 
 }
 
 #fb-global-fscore {
-    font-size: clamp(0.75rem, 1.5vh + 0.4vw, 1.1rem) !important; 
+    font-size: clamp(1rem, 2vh + 0.4vw, 1.4rem) !important; 
     margin-top: 0 !important;
 }
 
@@ -428,26 +526,13 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     border-left: 4px solid var(--control-sel-text); 
     border: 1px solid var(--border-color); 
 }
+
+/* Networking visualization tools */
 .neighbor-link { stroke: var(--neighbor-link); stroke-width: 1.5px; stroke-opacity: 0.7; }
 .neighbor-node circle { stroke: var(--neighbor-node-stroke); stroke-width: 2px; cursor: pointer; transition: stroke-width 0.3s ease, fill 0.4s ease; }
 .neighbor-node.center circle { stroke: #f1c40f; stroke-width: 4px; }
 
-/* --- INPUT STYLES FOR API CONTROLS --- */
-.input-style {
-    background-color: var(--bg-main);
-    border: 1px solid var(--border-color);
-    color: var(--text-title);
-    border-radius: 4px;
-    outline: none;
-    font-family: inherit;
-    transition: border-color 0.3s ease, background-color 0.3s ease, color 0.3s ease;
-}
-
-.input-style:focus {
-    border-color: var(--control-sel-text);
-}
-
-/* --- GLOBAL LOADER --- */
+/* Global loader sequence */
 #global-loader {
     position: fixed;
     top: 0;
