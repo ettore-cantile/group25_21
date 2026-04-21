@@ -182,9 +182,10 @@
                 
                 <div class="fp-config-wrapper">
                     <div class="fp-config-body">
+                        
                         <div class="fp-control-block">
                             <label>Calculation Method</label>
-                            <select id="fp-method-select" class="input-style" style="font-size: 0.95rem; padding: 6px 12px;">
+                            <select id="fp-method-select" class="input-style" style="font-size: 0.95rem; padding: 6px 12px; min-width: 190px;">
                                 <option value="weighted" selected>Weighted Distance</option>
                                 <option value="mismatch">K-Neighborhood Mismatch</option>
                                 <option value="stress">Stress Function (Alpha)</option>
@@ -196,61 +197,70 @@
                         <div class="fp-divider"></div>
             
                         <div id="fp-params-weighted" class="fp-params-group">
-                            <div class="fp-control-block">
-                                <label>K Neighbors</label>
+                            <div class="param-row">
+                                <label for="fp-k-weighted">K Neighbors:</label>
                                 <input type="number" id="fp-k-weighted" class="fp-param-input input-style fp-num-input" value="15" min="1" max="100">
                             </div>
-                            <div class="fp-control-block">
-                                <label>Threshold</label>
-                                <input type="number" id="fp-thresh-weighted" class="fp-param-input input-style fp-num-input" value="0.5" step="0.1" min="0" max="1">
+                            <div class="param-row">
+                                <label for="fp-thresh-weighted">Threshold:</label>
+                                <div class="slider-wrapper">
+                                    <input type="range" id="fp-thresh-weighted" class="fp-param-input" min="0" max="1" step="0.01" value="0.5">
+                                    <span id="val-fp-thresh-weighted">0.50</span>
+                                </div>
                             </div>
                         </div>
                         
                         <div id="fp-params-mismatch" class="fp-params-group hidden-panel">
-                            <div class="fp-control-block">
-                                <label>K Neighbors</label>
+                            <div class="param-row">
+                                <label for="fp-k-mismatch">K Neighbors:</label>
                                 <input type="number" id="fp-k-mismatch" class="fp-param-input input-style fp-num-input" value="15" min="1" max="100">
                             </div>
-                            <div class="fp-control-block">
-                                <label>Mismatch Rate</label>
-                                <input type="number" id="fp-thresh-mismatch" class="fp-param-input input-style fp-num-input" value="0.5" step="0.1" min="0" max="1">
+                            <div class="param-row">
+                                <label for="fp-thresh-mismatch">Mismatch Rate:</label>
+                                <div class="slider-wrapper">
+                                    <input type="range" id="fp-thresh-mismatch" class="fp-param-input" min="0" max="1" step="0.01" value="0.5">
+                                    <span id="val-fp-thresh-mismatch">0.50</span>
+                                </div>
                             </div>
                         </div>
                         
                         <div id="fp-params-stress" class="fp-params-group hidden-panel">
-                            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 180px; justify-content: center;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                    <label for="fp-thresh-stress" style="font-size: 0.85rem; font-weight: bold; color: var(--text-title); margin:0;">Threshold:</label>
-                                    <input type="range" id="fp-thresh-stress" class="fp-param-input" min="0" max="1" step="0.05" value="0.1" style="width: 90px; margin:0; padding:0; cursor: pointer;">
-                                    <span id="val-fp-thresh-stress" style="font-size: 0.85rem; font-weight: bold; width: 35px; text-align:right; color: var(--control-sel-text);">0.10</span>
+                            <div class="param-row">
+                                <label for="fp-thresh-stress">Threshold:</label>
+                                <div class="slider-wrapper">
+                                    <input type="range" id="fp-thresh-stress" class="fp-param-input" min="0" max="1" step="0.01" value="0.1">
+                                    <span id="val-fp-thresh-stress">0.10</span>
                                 </div>
                             </div>
                         </div>
 
                         <div id="fp-params-iterative" class="fp-params-group hidden-panel">
-                            <div style="display: flex; flex-direction: column; gap: 8px; min-width: 200px; justify-content: center;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                    <label for="fp-target-stress-pca" style="font-size: 0.85rem; font-weight: bold; color: var(--text-title); margin:0;">Target PCA:</label>
-                                    <input type="range" id="fp-target-stress-pca" class="fp-param-input" min="0" max="0.5" step="0.01" value="0.1" style="width: 80px; margin:0; padding:0; cursor: pointer;">
-                                    <span id="val-fp-target-stress-pca" style="font-size: 0.85rem; font-weight: bold; width: 35px; text-align:right; color: var(--control-sel-text);">0.10</span>
+                            <div class="param-row">
+                                <label for="fp-target-stress-pca">Target PCA:</label>
+                                <div class="slider-wrapper">
+                                    <input type="range" id="fp-target-stress-pca" class="fp-param-input" min="0" max="0.5" step="0.01" value="0.1">
+                                    <span id="val-fp-target-stress-pca">0.10</span>
                                 </div>
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                    <label for="fp-target-stress-mds" style="font-size: 0.85rem; font-weight: bold; color: var(--text-title); margin:0;">Target MDS:</label>
-                                    <input type="range" id="fp-target-stress-mds" class="fp-param-input" min="0" max="0.5" step="0.01" value="0.1" style="width: 80px; margin:0; padding:0; cursor: pointer;">
-                                    <span id="val-fp-target-stress-mds" style="font-size: 0.85rem; font-weight: bold; width: 35px; text-align:right; color: var(--control-sel-text);">0.10</span>
+                            </div>
+                            <div class="param-row">
+                                <label for="fp-target-stress-mds">Target MDS:</label>
+                                <div class="slider-wrapper">
+                                    <input type="range" id="fp-target-stress-mds" class="fp-param-input" min="0" max="0.5" step="0.01" value="0.1">
+                                    <span id="val-fp-target-stress-mds">0.10</span>
                                 </div>
                             </div>
                         </div>
                         
                         <div id="fp-params-centroids" class="fp-params-group hidden-panel">
-                            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 180px; justify-content: center;">
-                                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-                                    <label for="fp-thresh-centroids" style="font-size: 0.85rem; font-weight: bold; color: var(--text-title); margin:0;">Threshold:</label>
-                                    <input type="range" id="fp-thresh-centroids" class="fp-param-input" min="0" max="1" step="0.05" value="0.1" style="width: 90px; margin:0; padding:0; cursor: pointer;">
-                                    <span id="val-fp-thresh-centroids" style="font-size: 0.85rem; font-weight: bold; width: 35px; text-align:right; color: var(--control-sel-text);">0.10</span>
+                            <div class="param-row">
+                                <label for="fp-thresh-centroids">Threshold:</label>
+                                <div class="slider-wrapper">
+                                    <input type="range" id="fp-thresh-centroids" class="fp-param-input" min="0" max="1" step="0.01" value="0.1">
+                                    <span id="val-fp-thresh-centroids">0.10</span>
                                 </div>
                             </div>
                         </div>
+                        
                     </div>
 
                     <div class="fp-summary-box">

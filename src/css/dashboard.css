@@ -289,73 +289,121 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     align-items: stretch; 
     gap: 30px; 
     width: 100%; 
-    max-width: 950px;  /* Enlarged maximum width for better breathing room */
+    max-width: 950px;
     margin: 0 auto;    
     justify-content: center;
 }
 
+/* 2-COLUMN LAYOUT: Left side (Method) and Right side (Stacked Parameters) */
 .fp-config-body {
     display: flex;
+    flex-direction: row; /* Horizontal flow to separate left and right */
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: center;
     background: var(--control-bg); 
-    padding: 15px 25px;       /* Increased padding */
-    border-radius: 12px;      /* Modern roundness */
+    padding: 15px 30px; /* Generous padding for neatness */
+    border-radius: 12px;
     border: 1px solid var(--border-color);
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05); /* Softer inner shadow */
-    gap: 20px;                /* More space between blocks */
-    flex-wrap: wrap;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+    gap: 30px; /* Space between Left side, Divider, and Right side */
 }
 
+/* Left block: Method selector vertically stacked */
 .fp-control-block {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
+    flex-direction: column; /* Stack label above dropdown */
+    align-items: flex-start;
+    gap: 8px;
+    white-space: nowrap;
 }
 
 .fp-control-block label {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    margin: 0;
 }
 
+/* Divider separates Left and Right sides */
 .fp-divider {
     width: 1px; 
-    height: 40px; 
+    height: 65px; /* Taller divider to match the two stacked rows */
     background: var(--border-color); 
-    margin: 0 10px;
+    margin: 0;
 }
 
+/* Right block: Container for the parameters */
 .fp-params-group {
     display: flex;
+    flex-direction: column; /* Stack parameter rows ONE ON TOP OF THE OTHER */
+    align-items: flex-start;
+    justify-content: center;
+    gap: 12px; /* Spacing between rows */
+}
+
+/* Individual parameter row logic */
+.param-row {
+    display: flex;
     align-items: center;
-    gap: 20px;
+    justify-content: space-between;
+    width: 290px; /* Fixed width ensures sliders are perfectly aligned */
+}
+
+.param-row label {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--text-title);
+    margin: 0;
+    white-space: nowrap;
+}
+
+/* Sub-wrapper for Sliders & Values */
+.slider-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.slider-wrapper input[type="range"] {
+    width: 140px;
+    cursor: pointer;
+    margin: 0;
+    padding: 0;
+}
+
+.slider-wrapper span {
+    font-size: 0.85rem;
+    font-weight: bold;
+    color: var(--control-sel-text);
+    min-width: 35px;
+    text-align: right;
 }
 
 .fp-num-input {
-    width: 80px;
+    width: 70px;
     text-align: center;
-    padding: 6px 10px !important;
+    padding: 4px 8px !important;
 }
 
-/* Enlarged FP Table Sub-component Styles */
+/* Summary Box Styling */
 .fp-summary-box {
     background: var(--control-bg);
     border-radius: 12px; 
     border: 1px solid var(--border-color);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.05); /* Proper elevation shadow */
-    padding: 15px 25px; /* Spaced out inner content */
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    padding: 15px 25px;
     display: flex;
     align-items: center;
-    min-width: 360px; /* Force minimum width to not feel cramped */
+    min-width: 360px;
 }
 
 .fp-summary-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.95rem; /* Larger numeric text */
+    font-size: 0.95rem; 
 }
 
 .fp-summary-table th {
@@ -447,7 +495,7 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     color: var(--text-muted); line-height: 1.1; 
 }
 
-/* Centralized global stats grid (Header removed) */
+/* Centralized global stats grid */
 .global-stats-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -369,12 +369,22 @@ document.addEventListener("DOMContentLoaded", () => {
         togglePseudoCentroids(this.checked);
     });
 
-    // Updates span displays dynamically for the slider inputs
+    // Update value span displays dynamically for the slider inputs
+    
+    // Method 1 & 2
+    d3.select("#fp-thresh-weighted").on("input", function() {
+        d3.select("#val-fp-thresh-weighted").text(parseFloat(this.value).toFixed(2));
+    });
+    d3.select("#fp-thresh-mismatch").on("input", function() {
+        d3.select("#val-fp-thresh-mismatch").text(parseFloat(this.value).toFixed(2));
+    });
+
+    // Method 3
     d3.select("#fp-thresh-stress").on("input", function() {
         d3.select("#val-fp-thresh-stress").text(parseFloat(this.value).toFixed(2));
     });
 
-    // Update value span displays dynamically for the independent iterative stress sliders
+    // Method 4 (Iterative Stress)
     d3.select("#fp-target-stress-pca").on("input", function() {
         d3.select("#val-fp-target-stress-pca").text(parseFloat(this.value).toFixed(2));
     });
@@ -382,6 +392,7 @@ document.addEventListener("DOMContentLoaded", () => {
         d3.select("#val-fp-target-stress-mds").text(parseFloat(this.value).toFixed(2));
     });
 
+    // Method 5 (Centroids)
     d3.select("#fp-thresh-centroids").on("input", function() {
         d3.select("#val-fp-thresh-centroids").text(parseFloat(this.value).toFixed(2));
     });
