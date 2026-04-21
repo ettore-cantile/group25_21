@@ -143,6 +143,12 @@ function initDashboard(folder) {
                 d3.select("#fb-pca-cont").text((metadata.global_assessment.pca.continuity * 100).toFixed(1) + "%");
                 d3.select("#fb-mds-trust").text((metadata.global_assessment.mds.trustworthiness * 100).toFixed(1) + "%");
                 d3.select("#fb-mds-cont").text((metadata.global_assessment.mds.continuity * 100).toFixed(1) + "%");
+                
+                // ADDED: Extract and display Stress values
+                let pcaStress = metadata.global_assessment.pca.stress;
+                let mdsStress = metadata.global_assessment.mds.stress;
+                d3.select("#fb-pca-stress").text(pcaStress !== undefined ? (pcaStress * 100).toFixed(1) + "%" : "N/A");
+                d3.select("#fb-mds-stress").text(mdsStress !== undefined ? (mdsStress * 100).toFixed(1) + "%" : "N/A");
             }
             let gFScore = metadata.global_f_score || (metadata.global_assessment ? metadata.global_assessment.global_f_score : 0);
             d3.select("#fb-global-fscore").text(gFScore !== undefined ? (gFScore * 100).toFixed(1) + "%" : "N/A");
@@ -192,7 +198,6 @@ function initDashboard(folder) {
         if (d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
 
         // FIX: Synchronize the FPs with the active UI parameters IMMEDIATELY after rendering.
-        // This ensures the label counts are completely accurate before the user even interacts.
         recomputeFP();
 
     }).catch(err => {
@@ -203,13 +208,11 @@ function initDashboard(folder) {
 
 // Function to dynamically call the Public/Local Python microservice to compute False Positives
 async function recomputeFP() {
-    // Use the flag set in globals.js to switch environment seamlessly
     const baseUrl = USE_LOCAL_API ? LOCAL_API_URL : PUBLIC_API_URL;
     
     const k = parseInt(d3.select(".sync-k").node().value) || 15;
     const threshold = parseFloat(d3.select(".sync-thresh").node().value) || 0.8;
 
-    // 1. SHOW THE LOADER
     d3.select("#global-loader").classed("hidden-panel", false);
 
     try {
@@ -238,10 +241,7 @@ async function recomputeFP() {
         
     } catch (err) {
         console.warn("API Error:", err);
-        // Optional: you could show an alert to the user here if the API fails
-        // alert("Error during false positive computation.");
     } finally {
-        // 2. HIDE THE LOADER (always executed, both on success and error)
         d3.select("#global-loader").classed("hidden-panel", true);
     }
 }
@@ -269,7 +269,6 @@ document.addEventListener("DOMContentLoaded", () => {
         updateDatasetSelectWidth();
         currentDatasetName = this.value;
         initDashboard(currentDatasetName);
-        // recomputeFP() is safely called at the very end of initDashboard now.
     });
 
     d3.select("#search-point-id").on("input", function() {
@@ -554,7 +553,6 @@ function applyFilters() {
         }
     });
 
-    // Delegate visual styling to the master controller
     resetAllHovers();
         
     if(d3.select("#show-discrepancies").property("checked")) toggleDiscrepancies(true);
@@ -606,7 +604,6 @@ function toggleDiscrepancies(show) {
             });
 
             dataset.forEach(d => {
-                // Skips general filters but allows drawing links to FP-hidden points
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
                 
@@ -627,7 +624,6 @@ function toggleDiscrepancies(show) {
             });
         });
 
-        // Trigger visual reset to apply the border-only fill rule
         resetAllHovers();
 
         let activePoints = brushedPointsGlobal.length > 0 ? brushedPointsGlobal : dataset.filter(d => d.precision >= minPrecision && d.recall >= minRecall);
@@ -664,10 +660,8 @@ function updateSelection(d, skipNeighborGraph = false) {
     d3.select("#empty-state-placeholder").classed("hidden-panel", true);
     d3.select("#gauges-container").classed("hidden-panel", true);
 
-    // Apply master visual changes
     resetAllHovers();
 
-    // Bring targeted elements to the front to avoid overlap issues
     const neighborIds = d.neighbors || [];
     const activeIds = new Set([d.id, ...neighborIds]);
     d3.selectAll(".pc-line:not(.filtered-out)").filter(p => p.id === d.id).raise();
@@ -693,7 +687,6 @@ function updateSelection(d, skipNeighborGraph = false) {
             drawNeighborGraph(d, neighborsData);
         }
 
-        // Run this to ensure accurate "transparent inside" styling
         resetAllHovers();
 
     } else {
@@ -889,7 +882,6 @@ function enhanceColorModeSwitcher() {
 }
 
 function updateColors() {
-    // Triggers color updates but ensures border-only rules stay intact
     resetAllHovers();
 }
 

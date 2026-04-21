@@ -328,11 +328,12 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
     color: var(--text-muted); line-height: 1.1; 
 }
 
+/* --- TWEAKED FOR 4 ROWS OF CARDS INSTEAD OF 3 --- */
 .global-stats-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-auto-rows: minmax(0, 1fr); 
-    gap: clamp(2px, 0.8vh, 6px); 
+    gap: clamp(2px, 0.6vh, 4px); /* Slightly reduced gap to accommodate extra row */
     width: 100%;
     flex: 1; 
     min-height: 0; 
@@ -340,21 +341,22 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 
 .global-stat-card {
     display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; 
-    padding: clamp(2px, 0.6vh, 4px) 2px; 
+    padding: clamp(1px, 0.4vh, 3px) 2px; /* Slightly reduced padding */
     background: var(--bg-main); border-radius: 6px; 
     border: 1px solid var(--border-color); 
     min-width: 0; min-height: 0; 
     transition: background-color 0.4s ease, border-color 0.4s ease; box-sizing: border-box;
-    gap: clamp(1px, 0.5vh, 2px); 
+    gap: clamp(1px, 0.3vh, 2px); 
 }
 .global-stat-card h4 { 
     margin: 0; color: var(--text-muted); 
-    font-size: clamp(0.4rem, 0.7vh + 0.2vw, 0.6rem); 
+    font-size: clamp(0.35rem, 0.6vh + 0.2vw, 0.55rem); /* Slightly reduced font size */
     text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
     line-height: 1.1; width: 100%; 
 }
 .global-stat-card .val { 
-    font-size: clamp(0.7rem, 1.5vh + 0.3vw, 1.05rem); font-weight: bold; 
+    font-size: clamp(0.6rem, 1.2vh + 0.3vw, 0.95rem); /* Slightly reduced font size */
+    font-weight: bold; 
     margin: 0; color: var(--text-title); line-height: 1; 
 }
 
@@ -365,9 +367,10 @@ h1 { margin: 0; font-size: clamp(0.75rem, 1.5vw, 1.15rem); color: var(--text-tit
 }
 
 #fb-global-fscore {
-    font-size: clamp(0.85rem, 1.8vh + 0.4vw, 1.2rem) !important;
+    font-size: clamp(0.75rem, 1.5vh + 0.4vw, 1.1rem) !important; /* Slightly reduced */
     margin-top: 0 !important;
 }
+/* ------------------------------------------------ */
 
 .stat-card { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: clamp(2px, 1vh, 6px) clamp(5px, 1vw, 15px); background: var(--bg-main); border-radius: clamp(4px, 1vh, 8px); border: 1px solid var(--border-color); width: 80%; margin-bottom: clamp(2px, 1.5vh, 8px); min-height: 0; max-height: 35%; flex-shrink: 1; transition: background-color 0.4s ease; }
 .stat-card h4 { margin: 0; color: var(--text-muted); font-size: clamp(0.5rem, 1vh + 0.3vw, 0.75rem); text-transform: uppercase; }
