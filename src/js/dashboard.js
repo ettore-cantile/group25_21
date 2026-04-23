@@ -689,10 +689,9 @@ function applyFilters() {
     const hideFpGlobal = d3.select("#hide-fp-global").property("checked");
     const showFpOverlay = d3.select("#show-fp-overlay").property("checked");
     
-    // Static FP Tables logic 
-    const pcaFpCount = dataset.filter(d => d.is_fp_pca && d.precision >= minPrecision && d.recall >= minRecall).length;
-    const mdsFpCount = dataset.filter(d => d.is_fp_mds && d.precision >= minPrecision && d.recall >= minRecall).length;
-    d3.select("#fp-count-pca").text(pcaFpCount);
+    // Static FP Tables logic
+    const pcaFpCount = dataset.filter(d => d.is_fp_pca).length;
+    const mdsFpCount = dataset.filter(d => d.is_fp_mds).length; d3.select("#fp-count-pca").text(pcaFpCount);
     d3.select("#fp-count-mds").text(mdsFpCount);
 
     d3.selectAll(".dot, .pc-line").each(function(d) {
