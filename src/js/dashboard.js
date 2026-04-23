@@ -287,8 +287,11 @@ function togglePseudoCentroids(show) {
                 const coords = pseudoCentroidsPCA[k];
                 svgContainer.append("path")
                     .attr("class", "pseudo-centroid-path")
+                    // Bind raw coordinates via datum to enable zooming transformations
+                    .datum({x: coords[0], y: coords[1]})
                     .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
-                    .attr("transform", `translate(${scales.xScale(coords[0])}, ${scales.yScale(coords[1])})`)
+                    // Use current scales instead of fixed default scales
+                    .attr("transform", d => `translate(${scales.currentXScale(d.x)}, ${scales.currentYScale(d.y)})`)
                     .style("fill", colorOriginal(k))
                     .style("stroke", "var(--sankey-node-stroke)")
                     .style("stroke-width", 1.5)
@@ -306,8 +309,11 @@ function togglePseudoCentroids(show) {
                 const coords = pseudoCentroidsMDS[k];
                 svgContainer.append("path")
                     .attr("class", "pseudo-centroid-path")
+                    // Bind raw coordinates via datum to enable zooming transformations
+                    .datum({x: coords[0], y: coords[1]})
                     .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
-                    .attr("transform", `translate(${scales.xScale(coords[0])}, ${scales.yScale(coords[1])})`)
+                    // Use current scales instead of fixed default scales
+                    .attr("transform", d => `translate(${scales.currentXScale(d.x)}, ${scales.currentYScale(d.y)})`)
                     .style("fill", colorOriginal(k))
                     .style("stroke", "var(--sankey-node-stroke)")
                     .style("stroke-width", 1.5)
@@ -760,14 +766,16 @@ function toggleDiscrepancies(show) {
             const centroids = {};
             validKMeansClusters.forEach(k => centroids[k] = {x:0, y:0, count:0});
 
+            // Calculate centroids using raw data coordinates instead of scaled pixel values to allow zooming
             dataset.forEach(d => {
                 if(d.precision >= minPrecision && d.recall >= minRecall && d[clusterProp] !== undefined) {
-                    centroids[d[clusterProp]].x += scales.xScale(d[scales.xKey]);
-                    centroids[d[clusterProp]].y += scales.yScale(d[scales.yKey]);
+                    centroids[d[clusterProp]].x += d[scales.xKey];
+                    centroids[d[clusterProp]].y += d[scales.yKey];
                     centroids[d[clusterProp]].count += 1;
                 }
             });
 
+            // Compute averages for data-driven centroids
             validKMeansClusters.forEach(k => {
                 if(centroids[k].count > 0) {
                     centroids[k].x /= centroids[k].count;
@@ -775,25 +783,48 @@ function toggleDiscrepancies(show) {
                 }
             });
 
+            // Structure data to bind it to D3 links, enabling dynamic updates during zoom events
+            const linkData = [];
             dataset.forEach(d => {
                 if(d.precision < minPrecision || d.recall < minRecall || d[clusterProp] === undefined) return; 
                 if(centroids[d[clusterProp]].count === 0) return;
 
-                svgContainer.append("line")
-                    .attr("x1", scales.xScale(d[scales.xKey])).attr("y1", scales.yScale(d[scales.yKey]))
-                    .attr("x2", centroids[d[clusterProp]].x).attr("y2", centroids[d[clusterProp]].y)
-                    .attr("class", (d[anomalyProp] ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct") + ` pt-${d.id}`);
+                linkData.push({
+                    d: d,
+                    c: centroids[d[clusterProp]],
+                    isAnomaly: d[anomalyProp]
+                });
             });
 
-            validKMeansClusters.forEach(k => {
-                if(centroids[k].count === 0) return;
-                svgContainer.append("path")
-                    .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
-                    .attr("transform", `translate(${centroids[k].x}, ${centroids[k].y})`)
-                    .style("fill", colorOriginal(k)) 
-                    .style("stroke", "var(--sankey-node-stroke)") 
-                    .style("stroke-width", 1.5);
-            });
+            // Draw links with data binding and use current scales to respect active zoom transforms
+            svgContainer.selectAll(".centroid-link")
+                .data(linkData)
+                .enter()
+                .append("line")
+                .attr("x1", data => scales.currentXScale(data.d[scales.xKey]))
+                .attr("y1", data => scales.currentYScale(data.d[scales.yKey]))
+                .attr("x2", data => scales.currentXScale(data.c.x))
+                .attr("y2", data => scales.currentYScale(data.c.y))
+                .attr("class", data => (data.isAnomaly ? "centroid-link centroid-anomaly" : "centroid-link centroid-correct") + ` pt-${data.d.id}`);
+
+            // Prepare cross data for visualization
+            const crossData = validKMeansClusters.filter(k => centroids[k].count > 0).map(k => ({
+                k: k,
+                x: centroids[k].x,
+                y: centroids[k].y
+            }));
+
+            // Draw centroid crosses with data binding and the proper class attachment
+            svgContainer.selectAll(".centroid-cross")
+                .data(crossData)
+                .enter()
+                .append("path")
+                .attr("class", "centroid-cross")
+                .attr("d", d3.symbol().type(d3.symbolCross).size(150)())
+                .attr("transform", c => `translate(${scales.currentXScale(c.x)}, ${scales.currentYScale(c.y)})`)
+                .style("fill", c => colorOriginal(c.k)) 
+                .style("stroke", "var(--sankey-node-stroke)") 
+                .style("stroke-width", 1.5);
         });
 
         resetAllHovers();

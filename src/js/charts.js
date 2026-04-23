@@ -140,6 +140,10 @@ function drawPlot(containerSelector, xKey, yKey, plotId, brushObj, customColorFn
 
             centroidLayer.selectAll(".centroid-cross")
                 .attr("transform", c => `translate(${newX(c.x)}, ${newY(c.y)})`);
+                
+            // Update pseudo centroids positions during zoom based on bound datum
+            centroidLayer.selectAll(".pseudo-centroid-path")
+                .attr("transform", d => `translate(${newX(d.x)}, ${newY(d.y)})`);
 
             linkGroup.selectAll("line")
                 .attr("x1", data => newX(data.source[xKey]))
