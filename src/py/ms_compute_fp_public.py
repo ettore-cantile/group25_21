@@ -195,7 +195,6 @@ def calc_fp_iterative_stress(D_orig, D_proj, target_stress, max_iters=5000):
         fp_points.add(p1)
         fp_points.add(p2)
         
-        # CRITICAL FIX: Align the iterative loop with the point-based evaluation.
         # When a pair is identified as false, we consider the nodes corrupted.
         # Therefore, we must invalidate ALL pairs connected to these nodes.
         invalid_new = (i_upper == p1) | (i_upper == p2) | (j_upper == p1) | (j_upper == p2)

@@ -10,7 +10,6 @@ original_scripts = [
     "compute_relationship.py"
 ]
 
-
 # Reverse the order of the list
 reversed_scripts = original_scripts[::-1]
 
