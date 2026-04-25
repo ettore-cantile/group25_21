@@ -1,43 +1,51 @@
-# Visual Analytics Project: PCA vs. Euclidean MDS
+# Visual Analytics Project: Comparative Analysis of PCA and Euclidean MDS
 
 ## 🎯 Project Goal
-The main goal is to evaluate the **fidelity of PCA** (assessment and judgment) with respect to Euclidean distance and demonstrate how **Euclidean MDS** is better. Ultimately, the aim is to improve the quality of what is being observed and evaluate the usefulness of the visualization.
+The exploration of high-dimensional datasets relies fundamentally on Dimensionality Reduction (DR) techniques to embed complex mathematical structures into visualizable 2D spaces. However, these representations inherently suffer from topological distortions.
 
-**Main Focus:** Euclidean distance (PCA vs. Euclidean MDS).
-
----
-
-## 📊 Dataset
-The project uses the following datasets:
-- **Wine**
-- **Iris**
-- **User Knowledge Modelling**
+The main goal of this interactive Visual Analytics dashboard is to rigorously evaluate and compare the spatial fidelity of **Principal Component Analysis (PCA)** against **Euclidean Multidimensional Scaling (MDS)**. Ultimately, the aim is to empower domain experts to visually track structural discrepancies and demonstrate how foundational algorithmic choices dictate the validity of natural data groupings.
 
 ---
 
-## 🛠️ Development Pipeline (Three Main Steps)
+## 📊 Datasets
+The project uses the following benchmark datasets to observe algorithmic behaviors across varying degrees of feature overlap:
+- **Wine Quality:** 13 features, 3 classes (moderate class entanglement).
+- **Iris Flowers:** 4 features, 3 classes (highly separable topological structure).
+- **User Knowledge Modeling:** 5 features, 4 classes (highly entangled, non-linear topology).
 
-### 1. Quality Analysis & False Positives/Negatives
-Report the quality of PCA (what goes wrong; what the false positives are) and Euclidean MDS (both false positives and negatives) with respect to the dataset.
-* **Visualization:** Provide a double (and synchronized) visualization of the two scatterplots.
-* **Color Scale:** Implement a color scale useful for representing the positive or negative falsity index of the points.
-* **Quality Metrics:** Include metrics such as a global score representing the sum of the involved points.
-* **Initial Assessment:** Provide a preliminary judgment on the dataset (e.g., "80% of the points match"). 
-* **Defining Weights:** False positives and negatives (blue/red) must be given an appropriate **definition**. You must use metrics that are not simply "on/off" but instead consider their weight (i.e., *how much* of a false positive or negative they are).
+---
+
+## 🏗️ System Architecture
+The platform is built on a computationally decoupled client-server paradigm:
+* **Data & Logic Layer (Python):** Handles offline pre-computation (standardization, DR, K-Means) and provides dynamic Flask microservices for real-time False Positive computations.
+* **Presentation Layer (D3.js/HTML/CSS):** Provides a reactive, Coordinated Multiple Views (CMV) frontend for complex interactive exploration.
+
+---
+
+## 🛠️ Analytical Pipeline & Core Features
+
+### 1. Quality Analysis & False Positives/Negatives Identification
+The system moves beyond simple binary inclusion by calculating continuous, distance-weighted metrics:
+* **Local Metrics:** Computes Distance-Weighted Precision (penalizing spatial False Positives), Recall (Lack of False Negatives), and an F-Score using high-dimensional K-Nearest Neighbor (K-NN) graphs.
+* **Global Metrics:** Evaluates overall distance preservation using Trustworthiness, Continuity, and Normalized Stress.
+* **Explicit False Positive Filtering:** Instead of just observing errors, the backend dynamically isolates artifact points using strategies like *Point-to-Point Relative Error Analysis*, *Iterative Stress Minimization*, and *Pseudo-Centroid Distance Evaluation*.
 
 ### 2. Labels, K-Means Clustering, and Discrepancies
-Introduce labels (abstract ones, like wine producers, and data-dependent ones). 
-* **Cluster Analysis:** The objective is to evaluate the discrepancies between abstract clusters (which do not depend on the Euclidean distance calculation and are therefore independent of the dataset values) and data-inherent clusters, using techniques like **K-Means**.
-* **Visualizing Anomalies:** The visualization must offer the possibility to show the portions of the clusters that do not seem to belong to their assigned cluster via centroids (Note: some tools/references should have already been published by Santucci himself).
-* **Additional Tools:** Quality metrics and **filters** (for the removal of false positives or negatives) must be present, utilizing both Euclidean MDS and PCA.
+To evaluate the discrepancies between abstract ground-truth labels and data-inherent clusters, the dashboard incorporates:
+* **Cluster Agreement Flow:** A dedicated **Sankey Diagram** maps the migration of instances between ground truth, PCA-derived clusters, and MDS-derived clusters.
+* **Centroid Contextualization:** "Show Centroids" mode renders mathematical cluster centers and links points to centroids to visualize intra-cluster variance.
+* **Multivariate Filtering:** A **Parallel Coordinates Plot (PCP)** allows for axis-constrained selections that propagate back to the projection space.
 
-### 3. Dimensional Fidelity Evaluation
-Highlight how faithful the obtained two-dimensional projection is to the original multidimensional clusters/spaces.
-* **Switch Functionality:** The requirement is to create a switch that, through the use of K-Means, allows the user to visualize the possible intersections/areas of interest among the mentioned elements (the 3 original clusters, the "producers" clusters, etc.).
+### 3. Dimensional Fidelity Evaluation & Deep Diagnostics
+The interface relies on a robust Focus + Context strategy:
+* **Cross-View Brushing:** Geometric selections in scatterplots update Quality Gauges, the Sankey diagram, and the PCP simultaneously.
+* **Single-Point Inspection:** Narrowing focus to a single instance provides:
+    * A **Force-directed Neighbor Graph:** Reconstructs the high-dimensional neighborhood to identify "intruder" points.
+    * A **Multidimensional Radar Chart:** Compares the instance profile against reference classes.
 
 ---
 
-## Authors
+## 👥 Authors
 - Matteo Ventali (1985026)
 - Ettore Cantile (2026562)
 - Leonardo Chiarparin (2016363)
