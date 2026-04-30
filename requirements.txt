@@ -1,0 +1,12 @@
+# Analisi Dati e Calcolo Scientifico
+pandas
+numpy
+scikit-learn
+scipy
+
+# Microservizio e API (basato sui file ms_compute_fp_*.py)
+flask
+flask-cors
+
+# Utility
+python-dotenv
