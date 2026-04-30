@@ -45,6 +45,33 @@ The interface relies on a robust Focus + Context strategy:
 
 ---
 
+## 🐳 Docker: Build & Run Instructions
+### 1. Build the Docker Image
+From the root directory of the project (where the `Dockerfile` is located), run:
+
+```bash
+docker build -t visual-analytics-app .
+```
+
+### 2. Change target microservice
+Set variable ```USE_LOCAL_API = true``` inside ```src/js/globals.js```
+
+
+### 3. Run the Docker Container
+From the root directory of the project (where the `Dockerfile` is located), run:
+
+```bash
+docker run -p 8000:8000 -p 5000:5000 visual-analytics-app
+```
+
+### 4. Use the dashboard
+Access through a browser at the following url:
+```
+http://localhost:8000
+```
+
+---
+
 ## 👥 Authors
 - Matteo Ventali (1985026)
 - Ettore Cantile (2026562)
