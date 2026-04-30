@@ -74,7 +74,7 @@ http://localhost:8000
 
 ---
 
-## Global site
+## 🌐 Global site
 The dashboard is also available at:
 ```
 https://matteoventali.github.io/group25_21/
