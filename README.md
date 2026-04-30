@@ -46,15 +46,17 @@ The interface relies on a robust Focus + Context strategy:
 ---
 
 ## 🐳 Local installation
-### 1. Build the Docker Image
+
+### 1. Change target microservice
+Set variable ```USE_LOCAL_API = true``` inside ```src/js/globals.js```
+
+
+### 2. Build the Docker Image
 From the root directory of the project (where the `Dockerfile` is located), run:
 
 ```bash
 docker build -t visual-analytics-app .
 ```
-
-### 2. Change target microservice
-Set variable ```USE_LOCAL_API = true``` inside ```src/js/globals.js```
 
 
 ### 3. Run the Docker Container
