@@ -45,7 +45,7 @@ The interface relies on a robust Focus + Context strategy:
 
 ---
 
-## 🐳 Docker: Build & Run Instructions
+## 🐳 Local installation
 ### 1. Build the Docker Image
 From the root directory of the project (where the `Dockerfile` is located), run:
 
@@ -68,6 +68,14 @@ docker run -p 8000:8000 -p 5000:5000 visual-analytics-app
 Access through a browser at the following url:
 ```
 http://localhost:8000
+```
+
+---
+
+## Global site
+The dashboard is also available at:
+```
+https://matteoventali.github.io/group25_21/
 ```
 
 ---
